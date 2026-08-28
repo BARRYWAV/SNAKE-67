@@ -50,11 +50,19 @@ function createInitialSnake(index) {
   return [{ x: cfg.x, y: cfg.y }];
 }
 
-function placeFood(players) {
+function placeFood(players, zoneLevel = 0) {
+  const margin = zoneLevel; // food sólo dentro del área segura
+  const min = margin;
+  const max = TILE_COUNT - margin - 1;
+  // Si el área segura es demasiado pequeña, usar toda la cuadrícula
+  const safeMin = min <= max ? min : 0;
+  const safeMax = min <= max ? max : TILE_COUNT - 1;
+
   let valid = false, fx, fy;
+  let attempts = 0;
   while (!valid) {
-    fx = Math.floor(Math.random() * TILE_COUNT);
-    fy = Math.floor(Math.random() * TILE_COUNT);
+    fx = safeMin + Math.floor(Math.random() * (safeMax - safeMin + 1));
+    fy = safeMin + Math.floor(Math.random() * (safeMax - safeMin + 1));
     valid = true;
     for (const p of Object.values(players)) {
       for (const seg of p.snake) {
@@ -62,6 +70,7 @@ function placeFood(players) {
       }
       if (!valid) break;
     }
+    if (++attempts > 500) break; // evitar loop infinito
   }
   return { x: fx, y: fy };
 }
@@ -141,7 +150,7 @@ async function runGameTick(roomId) {
     if (newHead.x === room.food.x && newHead.y === room.food.y) {
       p.score++;
       // No hacemos pop → la serpiente crece 1 segmento
-      room.food = placeFood(room.players);
+      room.food = placeFood(room.players, room.zoneLevel);
     } else {
       p.snake.pop(); // No creció
     }
@@ -160,8 +169,14 @@ async function runGameTick(roomId) {
 
   io.to(roomId).emit('gameState', state);
 
-  // ¿Terminó la partida?
-  if (!anyAlive) {
+  // ¿Terminó la partida? — cuando queda ≤1 jugador vivo
+  const aliveCount = Object.values(room.players).filter(p => p.alive).length;
+  const totalPlayers = Object.keys(room.players).length;
+
+  // Terminar si: todos murieron, o sólo queda 1 vivo (en partida de 2+)
+  const gameEnded = aliveCount === 0 || (totalPlayers >= 2 && aliveCount <= 1);
+
+  if (gameEnded) {
     room.gameLoop = null;
     room.started = false;
 
