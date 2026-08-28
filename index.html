@@ -157,6 +157,13 @@
         #waiting-overlay { background: rgba(44,62,80,.95); border-radius: 8px; }
         #waiting-overlay p { color: #ccc; font-size: 15px; margin: 0; }
 
+        /* ── MÓVIL: botones más grandes ────────────────── */
+        @media (max-width: 767px) {
+            .dir-btn { width: 80px; height: 80px; font-size: 34px; border-width: 4px; box-shadow: 0 6px 0 #922b21; }
+            .dir-row { gap: 22px; }
+            .arcade-area { gap: 12px; }
+        }
+
         /* ── PC LAYOUT ───────────────────────────────────── */
         @media (min-width: 768px) {
             .top-bar { flex-direction: row; justify-content: space-between; padding: 12px 40px; }
@@ -232,7 +239,7 @@
                             <h3>🏆 Leaderboard Global</h3>
                             <div id="lb-rows"></div>
                         </div>
-                        <button class="btn-action" onclick="resetGame()">Volver a mamar</button>
+                        <button class="btn-action" id="btn-replay" onclick="resetGame()">Volver a mamar</button>
                         <button class="btn-action" style="background:var(--dark)" onclick="showScreen('screen-menu')">Menú</button>
                     </div>
                     <div class="overlay" id="waiting-overlay">
@@ -314,9 +321,18 @@ socket.on('playerLeft', () => {
 });
 
 socket.on('gameStarted', () => {
+    // Ocultar waiting overlay, limpiar game-over overlay y UI de revancha
     document.getElementById('waiting-overlay').classList.remove('active');
+    document.getElementById('game-over').classList.remove('active');
+    document.getElementById('go-leaderboard').style.display = 'none';
+    document.getElementById('mp-scores').innerHTML = '';
+    document.getElementById('score').innerText = '0';
+    resetTimer();
     showScreen('screen-game');
     document.getElementById('settings-bar').style.display = 'none';
+    // Texto del botón de replay para multi
+    document.getElementById('btn-replay').innerText = '🔁 Revancha';
+    startTimer();
 });
 
 socket.on('gameState', (state) => {
@@ -543,7 +559,13 @@ function handleGameOver() {
 }
 
 function resetGame() {
-    if(isMultiplayer){showScreen('screen-menu');return;}
+    if (isMultiplayer) {
+        // Pedir revancha al servidor — no salimos de la sala
+        socket.emit('rematch');
+        return;
+    }
+    // Modo solo
+    document.getElementById('btn-replay').innerText = 'Volver a mamar';
     clearTimeout(gameLoopTimeout);
     initGame();
 }
@@ -629,7 +651,16 @@ function handleInput(key, btnElem) {
 }
 
 document.body.addEventListener('keydown',(e)=>{
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){ e.preventDefault(); handleInput(e.key,null); }
+    const key = e.key;
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key)){
+        e.preventDefault();
+        // En multijugador enviar directamente al servidor sin validación local
+        if (isMultiplayer) {
+            socket.emit('playerInput', { key });
+            return;
+        }
+        handleInput(key, null);
+    }
 });
 </script>
 </body>

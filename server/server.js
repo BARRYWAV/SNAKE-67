@@ -238,10 +238,37 @@ io.on('connection', (socket) => {
     const p = room.players[socket.id];
     if (!p || !p.alive) return;
 
-    if (key === 'ArrowUp' && p.dy !== 1)  { p.dy = -1; p.dx = 0; }
-    else if (key === 'ArrowDown' && p.dy !== -1) { p.dy = 1; p.dx = 0; }
-    else if (key === 'ArrowLeft' && p.dx !== 1)  { p.dy = 0; p.dx = -1; }
-    else if (key === 'ArrowRight' && p.dx !== -1) { p.dy = 0; p.dx = 1; }
+    if (key === 'ArrowUp' && p.dy !== 1)    { p.dy = -1; p.dx = 0; }
+    else if (key === 'ArrowDown' && p.dy !== -1)  { p.dy = 1;  p.dx = 0; }
+    else if (key === 'ArrowLeft' && p.dx !== 1)   { p.dy = 0;  p.dx = -1; }
+    else if (key === 'ArrowRight' && p.dx !== -1) { p.dy = 0;  p.dx = 1; }
+  });
+
+  // Revancha — reiniciar la partida sin salir de la sala
+  socket.on('rematch', () => {
+    const roomId = socket.roomId;
+    const room = rooms[roomId];
+    if (!room) return;
+
+    // Detener loop anterior si sigue corriendo
+    if (room.gameLoop) { clearInterval(room.gameLoop); room.gameLoop = null; }
+
+    // Reiniciar estado de todos los jugadores
+    let idx = 0;
+    for (const [sid, p] of Object.entries(room.players)) {
+      p.snake = createInitialSnake(idx);
+      p.dx = idx % 2 === 0 ? 1 : -1;
+      p.dy = 0;
+      p.score = 0;
+      p.alive = true;
+      idx++;
+    }
+    room.food = placeFood(room.players);
+    room.started = true;
+
+    io.to(roomId).emit('gameStarted');
+    startGameLoop(roomId);
+    console.log(`🔄 Revancha en sala ${roomId}`);
   });
 
   // Obtener leaderboard global
