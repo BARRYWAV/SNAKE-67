@@ -47,10 +47,12 @@ function getRandomColor(usedColors) {
 function createInitialSnake(index) {
   const startX = index === 0 ? 10 : TILE_COUNT - 11;
   const startY = Math.floor(TILE_COUNT / 2);
+  const movingRight = index % 2 === 0; // jugadores pares van a la derecha, impares a la izquierda
+  const bodyOffset = movingRight ? -1 : 1; // el cuerpo va DETRÁS de la cabeza
   return [
-    { x: startX, y: startY },
-    { x: startX - 1, y: startY },
-    { x: startX - 2, y: startY }
+    { x: startX,               y: startY },
+    { x: startX + bodyOffset,  y: startY },
+    { x: startX + bodyOffset * 2, y: startY }
   ];
 }
 
