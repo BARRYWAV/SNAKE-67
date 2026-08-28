@@ -342,23 +342,35 @@ socket.on('gameState', (state) => {
 
 socket.on('gameOver', ({ players, leaderboard }) => {
     stopTimer();
-    const myData = players[mySocketId];
-    const title = myData && myData.alive ? '🏆 ¡Ganaste!' : 'mamaste';
-    document.getElementById('go-title').innerText = title;
 
-    // Render leaderboard
+    // Ordenar jugadores por score descendente
+    const sorted = Object.values(players).sort((a,b) => b.score - a.score);
+    const winner = sorted[0];
+    const myData = players[mySocketId];
+    const iWon = myData && myData.score === winner.score;
+
+    document.getElementById('go-title').innerText = iWon ? '🏆 ¡Ganaste!' : '💀 Perdiste';
+
+    // Mostrar puntos de esta partida
     const lbRows = document.getElementById('lb-rows');
-    lbRows.innerHTML = leaderboard.map((r, i) =>
-        `<div class="lb-row"><span>#${i+1} ${r.player_name}</span><span>${r.best_score} pts</span></div>`
+    let scoresHTML = '<div style="margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.2);padding-bottom:8px">';
+    sorted.forEach((p, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+        scoresHTML += `<div class="lb-row"><span>${medal} <span style="color:${p.color}">${p.name}</span></span><span>${p.score} ⭐</span></div>`;
+    });
+    scoresHTML += '</div>';
+    // Top global
+    scoresHTML += leaderboard.slice(0,5).map((r,i) =>
+        `<div class="lb-row"><span>#${i+1} ${r.player_name}</span><span>${r.best_score} ⭐</span></div>`
     ).join('');
+    lbRows.innerHTML = scoresHTML;
     document.getElementById('go-leaderboard').style.display = 'block';
     document.getElementById('game-over').classList.add('active');
 
-    // Mostrar scores MP
     const mpDiv = document.getElementById('mp-scores');
-    mpDiv.style.display = 'flex';
-    mpDiv.innerHTML = Object.values(players).map(p =>
-        `<span class="mp-score-item" style="background:${p.color}">${p.name}: ${p.score}</span>`
+    mpDiv.style.display='flex';
+    mpDiv.innerHTML=sorted.map(p=>
+        `<span class="mp-score-item" style="background:${p.color}">${p.name}: ${p.score} ⭐</span>`
     ).join('');
 });
 
@@ -441,8 +453,8 @@ const CANVAS_SIZE = 600;
 
 const sizeSettings = { small:{tileCount:20,tileSize:30}, medium:{tileCount:40,tileSize:15}, large:{tileCount:60,tileSize:10} };
 let currentSizeMode = 'medium', tileCount = 40, tileSize = 15;
-const speedSettings = { slow:150, medium:100, fast:60 };
-let currentSpeedMode = 'medium', gameSpeedBase = 100, gameSpeed = 100;
+const speedSettings = { slow: 250, medium: 200, fast: 120 }; // velocidades más lentas
+let currentSpeedMode = 'medium', gameSpeedBase = 200, gameSpeed = 200;
 
 let snake=[], dx=0, dy=0, foodX=0, foodY=0, score=0, highScore=0;
 let gameLoopTimeout, gameOver=false, gameStarted=false;
@@ -496,7 +508,8 @@ function resetTimer() { stopTimer(); elapsedTime=0; document.getElementById('tim
 function initGame() {
     const cx = Math.floor(tileCount/2);
     const cy = Math.floor(tileCount/2);
-    snake = [{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+    // Empieza con 1 solo segmento, crece al comer estrellas
+    snake = [{x:cx, y:cy}];
     dx=0; dy=0; score=0; gameOver=false; gameStarted=false; changingDirection=false;
     gameSpeed = gameSpeedBase;
     document.getElementById('score').innerText=0;
@@ -524,8 +537,9 @@ function soloGameLoop() {
         score++;
         document.getElementById('score').innerText=score;
         if(score>highScore){highScore=score;document.getElementById('high-score').innerText=highScore;localStorage.setItem(`snakeHighScore_${currentSpeedMode}_${currentSizeMode}`,highScore);}
-        gameSpeed=Math.max(30,gameSpeed-2);
+        gameSpeed=Math.max(60,gameSpeed-5); // aumenta velocidad al comer
         placeFood();
+        // No pop → crece
     } else { snake.pop(); }
     drawFood(); drawSnake();
     gameLoopTimeout=setTimeout(soloGameLoop,gameSpeed);
@@ -548,8 +562,26 @@ function drawSnake() {
 }
 
 function drawFood() {
-    ctx.fillStyle='#f1c40f';
-    ctx.fillRect(foodX*tileSize,foodY*tileSize,tileSize-1,tileSize-1);
+    // Dibujar estrella en lugar de cuadrado
+    drawStar(ctx, foodX * tileSize + tileSize/2, foodY * tileSize + tileSize/2, tileSize * 0.45);
+}
+
+function drawStar(ctx, cx, cy, radius) {
+    const spikes = 5;
+    const innerR = radius * 0.45;
+    let rot = -Math.PI / 2;
+    ctx.beginPath();
+    for (let i = 0; i < spikes * 2; i++) {
+        const r = i % 2 === 0 ? radius : innerR;
+        ctx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r);
+        rot += Math.PI / spikes;
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#f1c40f';
+    ctx.fill();
+    ctx.strokeStyle = '#f39c12';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 }
 
 function handleGameOver() {
@@ -573,9 +605,25 @@ function resetGame() {
 // ─────────────────────────────────────────────────────────────────────────────
 // RENDERIZADO MULTIJUGADOR
 // ─────────────────────────────────────────────────────────────────────────────
-const MP_TILE = CANVAS_SIZE / 40; // servidor siempre usa tileCount=40
+const MP_TILE = CANVAS_SIZE / 40;
+
+function drawStarAt(ctx, cx, cy, radius) {
+    const spikes = 5, innerR = radius * 0.45;
+    let rot = -Math.PI / 2;
+    ctx.beginPath();
+    for (let i = 0; i < spikes * 2; i++) {
+        const r = i % 2 === 0 ? radius : innerR;
+        ctx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r);
+        rot += Math.PI / spikes;
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#f1c40f'; ctx.fill();
+    ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 1; ctx.stroke();
+}
 
 function renderMultiplayerState(state) {
+    const zone = state.zoneLevel || 0;
+
     // Fondo
     ctx.fillStyle='#808080'; ctx.fillRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
     ctx.strokeStyle='#959595'; ctx.lineWidth=0.5;
@@ -584,12 +632,33 @@ function renderMultiplayerState(state) {
     for(let y=0;y<=CANVAS_SIZE;y+=MP_TILE){ctx.moveTo(0,y);ctx.lineTo(CANVAS_SIZE,y);}
     ctx.stroke();
 
-    // Comida
-    ctx.fillStyle='#f1c40f';
-    ctx.fillRect(state.food.x*MP_TILE, state.food.y*MP_TILE, MP_TILE-1, MP_TILE-1);
+    // Zona venenosa (filas rojas arriba y abajo)
+    if (zone > 0) {
+        ctx.fillStyle = 'rgba(200, 0, 0, 0.45)';
+        // Filas superiores
+        ctx.fillRect(0, 0, CANVAS_SIZE, zone * MP_TILE);
+        // Filas inferiores
+        ctx.fillRect(0, CANVAS_SIZE - zone * MP_TILE, CANVAS_SIZE, zone * MP_TILE);
+        // Borde brillante para marcar el límite
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, zone * MP_TILE); ctx.lineTo(CANVAS_SIZE, zone * MP_TILE);
+        ctx.moveTo(0, CANVAS_SIZE - zone * MP_TILE); ctx.lineTo(CANVAS_SIZE, CANVAS_SIZE - zone * MP_TILE);
+        ctx.stroke();
+        // Texto de advertencia
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = `bold ${Math.max(8, MP_TILE * 0.6)}px Inter`;
+        ctx.textAlign = 'center';
+        ctx.fillText('☠ ZONA VENENOSA ☠', CANVAS_SIZE/2, zone * MP_TILE - 3);
+    }
 
-    // Serpientes
+    // Estrella (food)
+    drawStarAt(ctx, state.food.x * MP_TILE + MP_TILE/2, state.food.y * MP_TILE + MP_TILE/2, MP_TILE * 0.45);
+
+    // Serpientes — solo las vivas
     for(const [sid, p] of Object.entries(state.players)){
+        if (!p.alive) continue; // muerta = desaparece
         p.snake.forEach((seg, i) => {
             ctx.fillStyle = i===0 ? darken(p.color) : p.color;
             ctx.fillRect(seg.x*MP_TILE, seg.y*MP_TILE, MP_TILE-1, MP_TILE-1);
@@ -604,14 +673,13 @@ function renderMultiplayerState(state) {
         }
     }
 
-    // Actualizar scores MP
+    // Scores en header
     const mpDiv=document.getElementById('mp-scores');
     mpDiv.style.display='flex';
     mpDiv.innerHTML=Object.values(state.players).map(p=>
-        `<span class="mp-score-item" style="background:${p.color}">${p.name}: ${p.score}${!p.alive?' 💀':''}</span>`
+        `<span class="mp-score-item" style="background:${p.alive ? p.color : '#555'};${!p.alive?'opacity:0.6':''}">${p.name}: ${p.score}${!p.alive?' 💀':''}</span>`
     ).join('');
 
-    // Actualizar mi score
     if(state.players[mySocketId])
         document.getElementById('score').innerText=state.players[mySocketId].score;
 }

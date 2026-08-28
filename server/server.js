@@ -7,32 +7,32 @@ const { initDB, saveScore, getLeaderboard } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: '*' }
-});
+const io = new Server(server, { cors: { origin: '*' } });
 
 const PORT = process.env.PORT || 3000;
-
-// Servir el frontend (index.html) desde la carpeta raíz del proyecto
 app.use(express.static(path.join(__dirname, '..')));
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTES DEL JUEGO
+// CONSTANTES
 // ─────────────────────────────────────────────────────────────────────────────
-const TILE_COUNT = 40;
-const GAME_SPEED_MS = 100;
+const TILE_COUNT   = 40;
+const SPEED_BASE   = 200; // ms — velocidad inicial lenta
+const SPEED_MIN    = 60;  // ms — velocidad máxima (más rápido)
+const SPEED_STEP   = 8;   // ms que se quita por cada punto del mejor jugador
 
 const COLORS = ['#ff3333', '#3399ff', '#33cc66', '#ff9933'];
 
+// Esquinas: posición y dirección inicial apuntando al centro
+const CORNER_CONFIGS = [
+  { x: 3,            y: 3,            dx: 1,  dy: 0 }, // top-left     → derecha
+  { x: TILE_COUNT-4, y: TILE_COUNT-4, dx: -1, dy: 0 }, // bottom-right ← izquierda
+  { x: TILE_COUNT-4, y: 3,            dx: -1, dy: 0 }, // top-right    ← izquierda
+  { x: 3,            y: TILE_COUNT-4, dx: 1,  dy: 0 }, // bottom-left  → derecha
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
-// ESTADO DE LAS SALAS EN MEMORIA
+// SALAS EN MEMORIA
 // ─────────────────────────────────────────────────────────────────────────────
-// rooms[roomId] = {
-//   players: { socketId: { name, snake, dx, dy, score, color, alive } },
-//   food: { x, y },
-//   gameLoop: intervalId | null,
-//   started: boolean
-// }
 const rooms = {};
 
 function generateRoomId() {
@@ -44,27 +44,14 @@ function getRandomColor(usedColors) {
   return available.length > 0 ? available[0] : COLORS[Math.floor(Math.random() * COLORS.length)];
 }
 
-// Posiciones y direcciones iniciales por jugador (esquinas, apuntando al centro)
-const CORNER_CONFIGS = [
-  // [headX, headY, dx, dy]  — cuerpo va DETRÁS (opuesto a dx/dy)
-  { x: 3,            y: 3,            dx: 1,  dy: 0  }, // esquina top-left → derecha
-  { x: TILE_COUNT-4, y: TILE_COUNT-4, dx: -1, dy: 0  }, // esquina bottom-right → izquierda
-  { x: TILE_COUNT-4, y: 3,            dx: -1, dy: 0  }, // esquina top-right → izquierda
-  { x: 3,            y: TILE_COUNT-4, dx: 1,  dy: 0  }, // esquina bottom-left → derecha
-];
-
 function createInitialSnake(index) {
   const cfg = CORNER_CONFIGS[index % CORNER_CONFIGS.length];
-  return [
-    { x: cfg.x,               y: cfg.y },
-    { x: cfg.x - cfg.dx,     y: cfg.y - cfg.dy },
-    { x: cfg.x - cfg.dx * 2, y: cfg.y - cfg.dy * 2 }
-  ];
+  // Empieza con UN solo segmento (la cabeza), crece al comer
+  return [{ x: cfg.x, y: cfg.y }];
 }
 
 function placeFood(players) {
-  let valid = false;
-  let fx, fy;
+  let valid = false, fx, fy;
   while (!valid) {
     fx = Math.floor(Math.random() * TILE_COUNT);
     fy = Math.floor(Math.random() * TILE_COUNT);
@@ -79,92 +66,124 @@ function placeFood(players) {
   return { x: fx, y: fy };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GAME LOOP (recursive setTimeout para velocidad dinámica)
+// ─────────────────────────────────────────────────────────────────────────────
+function calcSpeed(room) {
+  const alivePlayers = Object.values(room.players).filter(p => p.alive);
+  const maxScore = alivePlayers.length > 0 ? Math.max(...alivePlayers.map(p => p.score)) : 0;
+  return Math.max(SPEED_MIN, SPEED_BASE - maxScore * SPEED_STEP);
+}
+
+function calcZoneLevel(room) {
+  const alivePlayers = Object.values(room.players).filter(p => p.alive);
+  if (alivePlayers.length === 0) return 0;
+  // Zona crece cuando todos los vivos alcanzan el mismo mínimo de puntos
+  return Math.min(Math.floor(Math.min(...alivePlayers.map(p => p.score))), 8);
+}
+
+function scheduleNextTick(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+  const speed = calcSpeed(room);
+  room.gameLoop = setTimeout(() => runGameTick(roomId), speed);
+}
+
+async function runGameTick(roomId) {
+  const room = rooms[roomId];
+  if (!room || !room.started) return;
+
+  room.zoneLevel = calcZoneLevel(room);
+  let anyAlive = false;
+
+  for (const [sid, p] of Object.entries(room.players)) {
+    if (!p.alive) continue;
+    anyAlive = true;
+
+    // Mover cabeza
+    const newHead = { x: p.snake[0].x + p.dx, y: p.snake[0].y + p.dy };
+    p.snake.unshift(newHead);
+
+    // Colisión con paredes
+    if (newHead.x < 0 || newHead.x >= TILE_COUNT || newHead.y < 0 || newHead.y >= TILE_COUNT) {
+      p.alive = false; p.snake.pop(); continue;
+    }
+
+    // Colisión con zona venenosa (filas rojas)
+    if (room.zoneLevel > 0 &&
+        (newHead.y < room.zoneLevel || newHead.y >= TILE_COUNT - room.zoneLevel)) {
+      p.alive = false; p.snake.pop(); continue;
+    }
+
+    // Colisión consigo mismo
+    let selfHit = false;
+    for (let i = 1; i < p.snake.length; i++) {
+      if (p.snake[i].x === newHead.x && p.snake[i].y === newHead.y) { selfHit = true; break; }
+    }
+    if (selfHit) { p.alive = false; p.snake.pop(); continue; }
+
+    // Colisión con otras serpientes
+    let hitOther = false;
+    for (const [otherId, other] of Object.entries(room.players)) {
+      if (otherId === sid) continue;
+      for (const seg of other.snake) {
+        if (seg.x === newHead.x && seg.y === newHead.y) { hitOther = true; break; }
+      }
+      if (hitOther) break;
+    }
+    if (hitOther) { p.alive = false; p.snake.pop(); continue; }
+
+    // Comer estrella (food)
+    if (newHead.x === room.food.x && newHead.y === room.food.y) {
+      p.score++;
+      // No hacemos pop → la serpiente crece 1 segmento
+      room.food = placeFood(room.players);
+    } else {
+      p.snake.pop(); // No creció
+    }
+  }
+
+  // Construir estado para emitir
+  const state = {
+    players: Object.fromEntries(
+      Object.entries(room.players).map(([sid, p]) => [sid, {
+        name: p.name, snake: p.snake, score: p.score, color: p.color, alive: p.alive
+      }])
+    ),
+    food: room.food,
+    zoneLevel: room.zoneLevel
+  };
+
+  io.to(roomId).emit('gameState', state);
+
+  // ¿Terminó la partida?
+  if (!anyAlive) {
+    room.gameLoop = null;
+    room.started = false;
+
+    // Guardar scores
+    for (const p of Object.values(room.players)) {
+      try { await saveScore(p.name, p.score, roomId); } catch (e) { console.error(e); }
+    }
+
+    const leaderboard = await getLeaderboard(10);
+    io.to(roomId).emit('gameOver', { players: state.players, leaderboard });
+    return; // No reprogramar
+  }
+
+  scheduleNextTick(roomId);
+}
+
 function startGameLoop(roomId) {
   const room = rooms[roomId];
   if (!room || room.gameLoop) return;
+  scheduleNextTick(roomId);
+}
 
-  room.gameLoop = setInterval(async () => {
-    const room = rooms[roomId];
-    if (!room) return;
-
-    let anyAlive = false;
-
-    for (const [sid, p] of Object.entries(room.players)) {
-      if (!p.alive) continue;
-      anyAlive = true;
-
-      // Mover cabeza
-      const newHead = { x: p.snake[0].x + p.dx, y: p.snake[0].y + p.dy };
-      p.snake.unshift(newHead);
-
-      // Colisión con paredes
-      if (newHead.x < 0 || newHead.x >= TILE_COUNT || newHead.y < 0 || newHead.y >= TILE_COUNT) {
-        p.alive = false;
-        p.snake.pop();
-        continue;
-      }
-
-      // Colisión consigo mismo
-      let selfCollision = false;
-      for (let i = 1; i < p.snake.length; i++) {
-        if (p.snake[i].x === newHead.x && p.snake[i].y === newHead.y) {
-          selfCollision = true;
-          break;
-        }
-      }
-      if (selfCollision) { p.alive = false; p.snake.pop(); continue; }
-
-      // Colisión con otras serpientes
-      let hitOther = false;
-      for (const [otherId, other] of Object.entries(room.players)) {
-        if (otherId === sid) continue;
-        for (const seg of other.snake) {
-          if (seg.x === newHead.x && seg.y === newHead.y) { hitOther = true; break; }
-        }
-        if (hitOther) break;
-      }
-      if (hitOther) { p.alive = false; p.snake.pop(); continue; }
-
-      // Comer comida
-      if (newHead.x === room.food.x && newHead.y === room.food.y) {
-        p.score++;
-        room.food = placeFood(room.players);
-      } else {
-        p.snake.pop();
-      }
-    }
-
-    // Construir estado para enviar al cliente
-    const state = {
-      players: Object.fromEntries(
-        Object.entries(room.players).map(([sid, p]) => [sid, {
-          name: p.name,
-          snake: p.snake,
-          score: p.score,
-          color: p.color,
-          alive: p.alive
-        }])
-      ),
-      food: room.food
-    };
-
-    io.to(roomId).emit('gameState', state);
-
-    // Terminar juego cuando no queda nadie vivo (o solo 1 player murió)
-    if (!anyAlive) {
-      clearInterval(room.gameLoop);
-      room.gameLoop = null;
-
-      // Guardar scores en PostgreSQL
-      for (const p of Object.values(room.players)) {
-        try { await saveScore(p.name, p.score, roomId); } catch (e) { console.error(e); }
-      }
-
-      const leaderboard = await getLeaderboard(10);
-      io.to(roomId).emit('gameOver', { players: state.players, leaderboard });
-    }
-
-  }, GAME_SPEED_MS);
+function stopGameLoop(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+  if (room.gameLoop) { clearTimeout(room.gameLoop); room.gameLoop = null; }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,17 +195,15 @@ io.on('connection', (socket) => {
   // Crear sala
   socket.on('createRoom', ({ playerName }, callback) => {
     const roomId = generateRoomId();
-    rooms[roomId] = { players: {}, food: { x: 20, y: 20 }, gameLoop: null, started: false };
+    rooms[roomId] = { players: {}, food: { x: 20, y: 20 }, gameLoop: null, started: false, zoneLevel: 0 };
 
-    const color = getRandomColor([]);
     const cfg = CORNER_CONFIGS[0];
+    const color = getRandomColor([]);
     rooms[roomId].players[socket.id] = {
       name: playerName || 'Jugador 1',
       snake: createInitialSnake(0),
       dx: cfg.dx, dy: cfg.dy,
-      score: 0,
-      color,
-      alive: true
+      score: 0, color, alive: true
     };
     socket.join(roomId);
     socket.roomId = roomId;
@@ -210,100 +227,84 @@ io.on('connection', (socket) => {
       name: playerName || `Jugador ${playerIndex + 1}`,
       snake: createInitialSnake(playerIndex),
       dx: cfg.dx, dy: cfg.dy,
-      score: 0,
-      color,
-      alive: true
+      score: 0, color, alive: true
     };
     socket.join(roomId);
     socket.roomId = roomId;
 
-    // Notificar a todos en la sala que alguien se unió
     io.to(roomId).emit('playerJoined', {
       players: Object.fromEntries(
         Object.entries(room.players).map(([sid, p]) => [sid, { name: p.name, color: p.color }])
       )
     });
-
     callback({ success: true, roomId, color });
   });
 
-  // Iniciar partida (solo el creador)
+  // Iniciar partida
   socket.on('startGame', () => {
-    const roomId = socket.roomId;
-    const room = rooms[roomId];
+    const room = rooms[socket.roomId];
     if (!room) return;
-
     room.food = placeFood(room.players);
     room.started = true;
-    io.to(roomId).emit('gameStarted');
-    startGameLoop(roomId);
+    room.zoneLevel = 0;
+    io.to(socket.roomId).emit('gameStarted');
+    startGameLoop(socket.roomId);
   });
 
   // Input del jugador
   socket.on('playerInput', ({ key }) => {
-    const roomId = socket.roomId;
-    const room = rooms[roomId];
+    const room = rooms[socket.roomId];
     if (!room || !room.started) return;
-
     const p = room.players[socket.id];
     if (!p || !p.alive) return;
 
-    if (key === 'ArrowUp' && p.dy !== 1)    { p.dy = -1; p.dx = 0; }
-    else if (key === 'ArrowDown' && p.dy !== -1)  { p.dy = 1;  p.dx = 0; }
-    else if (key === 'ArrowLeft' && p.dx !== 1)   { p.dy = 0;  p.dx = -1; }
+    if      (key === 'ArrowUp'    && p.dy !== 1)  { p.dy = -1; p.dx = 0; }
+    else if (key === 'ArrowDown'  && p.dy !== -1) { p.dy = 1;  p.dx = 0; }
+    else if (key === 'ArrowLeft'  && p.dx !== 1)  { p.dy = 0;  p.dx = -1; }
     else if (key === 'ArrowRight' && p.dx !== -1) { p.dy = 0;  p.dx = 1; }
   });
 
-  // Revancha — reiniciar la partida sin salir de la sala
+  // Revancha — misma sala, reset completo
   socket.on('rematch', () => {
     const roomId = socket.roomId;
     const room = rooms[roomId];
     if (!room) return;
 
-    // Detener loop anterior si sigue corriendo
-    if (room.gameLoop) { clearInterval(room.gameLoop); room.gameLoop = null; }
+    stopGameLoop(roomId);
 
-    // Reiniciar estado de todos los jugadores
     let idx = 0;
     for (const [sid, p] of Object.entries(room.players)) {
       const cfg = CORNER_CONFIGS[idx % CORNER_CONFIGS.length];
       p.snake = createInitialSnake(idx);
-      p.dx = cfg.dx;
-      p.dy = cfg.dy;
-      p.score = 0;
-      p.alive = true;
+      p.dx = cfg.dx; p.dy = cfg.dy;
+      p.score = 0; p.alive = true;
       idx++;
     }
     room.food = placeFood(room.players);
     room.started = true;
+    room.zoneLevel = 0;
 
     io.to(roomId).emit('gameStarted');
     startGameLoop(roomId);
     console.log(`🔄 Revancha en sala ${roomId}`);
   });
 
-  // Obtener leaderboard global
+  // Leaderboard global
   socket.on('getLeaderboard', async (callback) => {
-    try {
-      const leaderboard = await getLeaderboard(10);
-      callback({ success: true, leaderboard });
-    } catch (e) {
-      callback({ success: false, leaderboard: [] });
-    }
+    try { callback({ success: true, leaderboard: await getLeaderboard(10) }); }
+    catch (e) { callback({ success: false, leaderboard: [] }); }
   });
 
   // Desconexión
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     if (!roomId || !rooms[roomId]) return;
-
     delete rooms[roomId].players[socket.id];
     console.log(`❌ Desconectado: ${socket.id} de sala ${roomId}`);
-
     if (Object.keys(rooms[roomId].players).length === 0) {
-      clearInterval(rooms[roomId].gameLoop);
+      stopGameLoop(roomId);
       delete rooms[roomId];
-      console.log(`🗑️  Sala ${roomId} eliminada (vacía)`);
+      console.log(`🗑️  Sala ${roomId} eliminada`);
     } else {
       io.to(roomId).emit('playerLeft', { socketId: socket.id });
     }
@@ -314,10 +315,5 @@ io.on('connection', (socket) => {
 // ARRANQUE
 // ─────────────────────────────────────────────────────────────────────────────
 initDB().then(() => {
-  server.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  });
-}).catch(err => {
-  console.error('Error al iniciar la base de datos:', err);
-  process.exit(1);
-});
+  server.listen(PORT, () => console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`));
+}).catch(err => { console.error('Error DB:', err); process.exit(1); });
