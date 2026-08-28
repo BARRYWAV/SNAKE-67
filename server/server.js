@@ -109,9 +109,13 @@ async function runGameTick(roomId) {
       p.alive = false; p.snake.pop(); continue;
     }
 
-    // Colisión con zona venenosa (filas rojas)
-    if (room.zoneLevel > 0 &&
-        (newHead.y < room.zoneLevel || newHead.y >= TILE_COUNT - room.zoneLevel)) {
+    // Colisión con zona venenosa (crece por los 4 lados)
+    if (room.zoneLevel > 0 && (
+        newHead.y < room.zoneLevel ||
+        newHead.y >= TILE_COUNT - room.zoneLevel ||
+        newHead.x < room.zoneLevel ||
+        newHead.x >= TILE_COUNT - room.zoneLevel
+    )) {
       p.alive = false; p.snake.pop(); continue;
     }
 

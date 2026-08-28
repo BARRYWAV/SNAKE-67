@@ -115,7 +115,7 @@
             flex: 1 1 auto; min-height: 0; width: 100%;
         }
         .canvas-container { position: relative; aspect-ratio: 1/1; max-height: 100%; max-width: 100%; }
-        canvas { background: #808080; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,.3); width: 100%; height: 100%; display: block; touch-action: none; }
+        canvas { background: #8a1a1a; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,.3); width: 100%; height: 100%; display: block; touch-action: none; }
 
         .controls-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 400px; flex: 0 0 auto; }
         .settings-bar { display: flex; justify-content: space-between; width: 100%; background: rgba(0,0,0,.1); padding: 10px; border-radius: 12px; gap: 10px; }
@@ -546,12 +546,13 @@ function soloGameLoop() {
 }
 
 function clearScreen() {
-    ctx.fillStyle='#808080'; ctx.fillRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
-    ctx.strokeStyle='#959595'; ctx.lineWidth=1;
-    ctx.beginPath();
-    for(let x=0;x<=CANVAS_SIZE;x+=tileSize){ctx.moveTo(x,0);ctx.lineTo(x,CANVAS_SIZE);}
-    for(let y=0;y<=CANVAS_SIZE;y+=tileSize){ctx.moveTo(0,y);ctx.lineTo(CANVAS_SIZE,y);}
-    ctx.stroke();
+    // Tablero de ajedrez: cuadros grises alternos, sin líneas
+    for (let row = 0; row < tileCount; row++) {
+        for (let col = 0; col < tileCount; col++) {
+            ctx.fillStyle = (row + col) % 2 === 0 ? '#8a8a8a' : '#707070';
+            ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
+        }
+    }
 }
 
 function drawSnake() {
@@ -562,25 +563,16 @@ function drawSnake() {
 }
 
 function drawFood() {
-    // Dibujar estrella en lugar de cuadrado
-    drawStar(ctx, foodX * tileSize + tileSize/2, foodY * tileSize + tileSize/2, tileSize * 0.45);
-}
-
-function drawStar(ctx, cx, cy, radius) {
-    const spikes = 5;
-    const innerR = radius * 0.45;
-    let rot = -Math.PI / 2;
+    // Círculo amarillo brillante
+    const cx = foodX * tileSize + tileSize / 2;
+    const cy = foodY * tileSize + tileSize / 2;
+    const r  = tileSize * 0.38;
     ctx.beginPath();
-    for (let i = 0; i < spikes * 2; i++) {
-        const r = i % 2 === 0 ? radius : innerR;
-        ctx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r);
-        rot += Math.PI / spikes;
-    }
-    ctx.closePath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fillStyle = '#f1c40f';
     ctx.fill();
-    ctx.strokeStyle = '#f39c12';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#d4ac0d';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 }
 
@@ -607,81 +599,85 @@ function resetGame() {
 // ─────────────────────────────────────────────────────────────────────────────
 const MP_TILE = CANVAS_SIZE / 40;
 
-function drawStarAt(ctx, cx, cy, radius) {
-    const spikes = 5, innerR = radius * 0.45;
-    let rot = -Math.PI / 2;
-    ctx.beginPath();
-    for (let i = 0; i < spikes * 2; i++) {
-        const r = i % 2 === 0 ? radius : innerR;
-        ctx.lineTo(cx + Math.cos(rot) * r, cy + Math.sin(rot) * r);
-        rot += Math.PI / spikes;
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#f1c40f'; ctx.fill();
-    ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 1; ctx.stroke();
-}
-
 function renderMultiplayerState(state) {
     const zone = state.zoneLevel || 0;
+    const safe = CANVAS_SIZE - zone * MP_TILE * 2; // área segura en el centro
 
-    // Fondo
-    ctx.fillStyle='#808080'; ctx.fillRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
-    ctx.strokeStyle='#959595'; ctx.lineWidth=0.5;
-    ctx.beginPath();
-    for(let x=0;x<=CANVAS_SIZE;x+=MP_TILE){ctx.moveTo(x,0);ctx.lineTo(x,CANVAS_SIZE);}
-    for(let y=0;y<=CANVAS_SIZE;y+=MP_TILE){ctx.moveTo(0,y);ctx.lineTo(CANVAS_SIZE,y);}
-    ctx.stroke();
-
-    // Zona venenosa (filas rojas arriba y abajo)
-    if (zone > 0) {
-        ctx.fillStyle = 'rgba(200, 0, 0, 0.45)';
-        // Filas superiores
-        ctx.fillRect(0, 0, CANVAS_SIZE, zone * MP_TILE);
-        // Filas inferiores
-        ctx.fillRect(0, CANVAS_SIZE - zone * MP_TILE, CANVAS_SIZE, zone * MP_TILE);
-        // Borde brillante para marcar el límite
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, zone * MP_TILE); ctx.lineTo(CANVAS_SIZE, zone * MP_TILE);
-        ctx.moveTo(0, CANVAS_SIZE - zone * MP_TILE); ctx.lineTo(CANVAS_SIZE, CANVAS_SIZE - zone * MP_TILE);
-        ctx.stroke();
-        // Texto de advertencia
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.font = `bold ${Math.max(8, MP_TILE * 0.6)}px Inter`;
-        ctx.textAlign = 'center';
-        ctx.fillText('☠ ZONA VENENOSA ☠', CANVAS_SIZE/2, zone * MP_TILE - 3);
+    // Tablero de ajedrez (sin líneas)
+    for (let row = 0; row < 40; row++) {
+        for (let col = 0; col < 40; col++) {
+            ctx.fillStyle = (row + col) % 2 === 0 ? '#8a8a8a' : '#707070';
+            ctx.fillRect(col * MP_TILE, row * MP_TILE, MP_TILE, MP_TILE);
+        }
     }
 
-    // Estrella (food)
-    drawStarAt(ctx, state.food.x * MP_TILE + MP_TILE/2, state.food.y * MP_TILE + MP_TILE/2, MP_TILE * 0.45);
+    // Zona venenosa — los 4 lados, rojo semitransparente encima del tablero
+    if (zone > 0) {
+        ctx.fillStyle = 'rgba(180, 0, 0, 0.55)';
+        // Arriba
+        ctx.fillRect(0, 0, CANVAS_SIZE, zone * MP_TILE);
+        // Abajo
+        ctx.fillRect(0, CANVAS_SIZE - zone * MP_TILE, CANVAS_SIZE, zone * MP_TILE);
+        // Izquierda
+        ctx.fillRect(0, zone * MP_TILE, zone * MP_TILE, CANVAS_SIZE - zone * MP_TILE * 2);
+        // Derecha
+        ctx.fillRect(CANVAS_SIZE - zone * MP_TILE, zone * MP_TILE, zone * MP_TILE, CANVAS_SIZE - zone * MP_TILE * 2);
+
+        // Borde brillante (línea interior del área segura)
+        ctx.strokeStyle = '#ff2020';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+            zone * MP_TILE, zone * MP_TILE,
+            CANVAS_SIZE - zone * MP_TILE * 2,
+            CANVAS_SIZE - zone * MP_TILE * 2
+        );
+
+        // Texto en cada lado si hay espacio
+        if (zone >= 2) {
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.font = `bold ${Math.max(7, MP_TILE * 0.55)}px Inter`;
+            ctx.textAlign = 'center';
+            ctx.fillText('☠ ZONA VENENOSA ☠', CANVAS_SIZE / 2, zone * MP_TILE - 2);
+        }
+    }
+
+    // Círculo amarillo (food)
+    const fx = state.food.x * MP_TILE + MP_TILE / 2;
+    const fy = state.food.y * MP_TILE + MP_TILE / 2;
+    ctx.beginPath();
+    ctx.arc(fx, fy, MP_TILE * 0.38, 0, Math.PI * 2);
+    ctx.fillStyle = '#f1c40f';
+    ctx.fill();
+    ctx.strokeStyle = '#d4ac0d';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     // Serpientes — solo las vivas
-    for(const [sid, p] of Object.entries(state.players)){
-        if (!p.alive) continue; // muerta = desaparece
+    for (const [sid, p] of Object.entries(state.players)) {
+        if (!p.alive) continue;
         p.snake.forEach((seg, i) => {
-            ctx.fillStyle = i===0 ? darken(p.color) : p.color;
-            ctx.fillRect(seg.x*MP_TILE, seg.y*MP_TILE, MP_TILE-1, MP_TILE-1);
+            ctx.fillStyle = i === 0 ? darken(p.color) : p.color;
+            ctx.fillRect(seg.x * MP_TILE, seg.y * MP_TILE, MP_TILE - 1, MP_TILE - 1);
         });
-        // Nombre encima de la cabeza
-        if(p.snake.length>0){
-            const head=p.snake[0];
-            ctx.fillStyle='white';
-            ctx.font=`bold ${Math.max(8,MP_TILE*0.7)}px Inter`;
-            ctx.textAlign='center';
-            ctx.fillText(p.name, head.x*MP_TILE + MP_TILE/2, head.y*MP_TILE - 2);
+        // Nombre sobre la cabeza
+        if (p.snake.length > 0) {
+            const head = p.snake[0];
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${Math.max(8, MP_TILE * 0.7)}px Inter`;
+            ctx.textAlign = 'center';
+            ctx.fillText(p.name, head.x * MP_TILE + MP_TILE / 2, head.y * MP_TILE - 2);
         }
     }
 
     // Scores en header
-    const mpDiv=document.getElementById('mp-scores');
-    mpDiv.style.display='flex';
-    mpDiv.innerHTML=Object.values(state.players).map(p=>
-        `<span class="mp-score-item" style="background:${p.alive ? p.color : '#555'};${!p.alive?'opacity:0.6':''}">${p.name}: ${p.score}${!p.alive?' 💀':''}</span>`
+    const mpDiv = document.getElementById('mp-scores');
+    mpDiv.style.display = 'flex';
+    mpDiv.innerHTML = Object.values(state.players).map(p =>
+        `<span class="mp-score-item" style="background:${p.alive ? p.color : '#555'};${!p.alive ? 'opacity:0.6' : ''}">${p.name}: ${p.score}${!p.alive ? ' 💀' : ''}</span>`
     ).join('');
 
-    if(state.players[mySocketId])
-        document.getElementById('score').innerText=state.players[mySocketId].score;
+    if (state.players[mySocketId])
+        document.getElementById('score').innerText = state.players[mySocketId].score;
 }
 
 function darken(hex) {
