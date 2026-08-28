@@ -2,99 +2,114 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>SNAKE 67</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
 
+        :root {
+            --bg-color: #f1c40f;
+            --brand-red: #e74c3c;
+            --dark-bg: #2c3e50;
+        }
+
         body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
             margin: 0;
-            background: linear-gradient(135deg, #1f1c2c 0%, #928dab 100%);
-            color: white;
+            padding: 0;
+            background: var(--bg-color);
             font-family: 'Inter', sans-serif;
-            overflow: hidden;
-        }
-
-        .main-layout {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: center;
-            gap: 40px;
-        }
-
-        .game-column {
+            color: white;
+            /* Evitar el scroll en móviles para que se sienta como App nativa */
+            height: 100vh; 
+            height: 100dvh;
+            overflow: hidden; 
             display: flex;
             flex-direction: column;
-            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        h1.logo {
-            margin: 0 0 15px 0;
-            font-size: 56px;
-            font-weight: 800;
-            text-transform: uppercase;
-            background: linear-gradient(to right, #f39c12, #ff4757);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 2px 4px 10px rgba(0,0,0,0.3);
-            letter-spacing: 3px;
-        }
-
-        .game-container {
-            position: relative;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            border-radius: 12px;
-            padding: 15px;
-            background: rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-        }
-
-        canvas {
-            background-color: #808080; /* Piso gris */
-            border-radius: 8px;
-            display: block;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
-        }
-
-        #score-board {
+        /* HEADER */
+        .top-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            width: 100%;
-            margin-bottom: 15px;
+            padding: 10px 20px;
         }
 
-        .score-box {
-            background: rgba(0,0,0,0.5);
-            padding: 8px 16px;
-            border-radius: 20px;
+        h1.logo {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--brand-red);
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+            letter-spacing: 2px;
+        }
+
+        .btn-settings {
+            background: var(--dark-bg);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            font-size: 22px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: opacity 0.3s;
+        }
+
+        /* SCORE BOARD */
+        #score-board {
+            display: flex;
+            justify-content: space-evenly;
+            background: var(--dark-bg);
+            padding: 10px 10px;
+            font-size: 15px;
             font-weight: bold;
-            font-size: 16px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            min-width: 90px;
-            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            z-index: 5;
         }
 
+        /* ÁREA DEL JUEGO */
+        .game-area {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            position: relative;
+            background: rgba(0,0,0,0.05); /* Ligeramente más oscuro el fondo del área */
+        }
+
+        canvas {
+            background-color: #808080;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            /* Escalar dinámicamente manteniendo proporción perfecta cuadrada */
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+            touch-action: none; /* Crucial para evitar rebotes de pantalla al tocar el mapa */
+        }
+
+        /* OVERLAYS (Game Over & Settings) */
         .overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            border-radius: 12px;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s ease;
+            z-index: 100;
         }
 
         .overlay.active {
@@ -103,142 +118,175 @@
         }
 
         .overlay h2 {
-            font-size: 64px;
-            margin: 0 0 30px 0;
-            color: #ff4757;
-            text-shadow: 0 0 20px rgba(255,71,87,0.8);
+            font-size: clamp(40px, 12vw, 64px);
+            margin: 0 0 20px 0;
+            color: var(--brand-red);
+            text-shadow: 0 0 15px rgba(231, 76, 60, 0.8);
             text-transform: uppercase;
         }
 
         .btn-action {
-            background: #ff4757;
+            background: var(--brand-red);
             color: white;
             border: none;
-            padding: 15px 35px;
+            padding: 15px 30px;
             font-size: 20px;
             font-weight: bold;
             border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
             cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
-            box-shadow: 0 6px 20px rgba(255,71,87,0.5);
-        }
-
-        .btn-action:hover {
-            transform: scale(1.05);
-            background: #ff6b81;
         }
 
         .btn-action:active {
             transform: scale(0.95);
         }
 
-        .controls-hint {
-            margin-top: 20px;
-            font-size: 15px;
-            color: rgba(255,255,255,0.8);
-        }
-
-        /* Sidebar styles */
-        .sidebar-column {
+        /* SETTINGS MODAL */
+        .settings-modal {
+            background: var(--dark-bg);
+            padding: 20px;
+            border-radius: 12px;
+            width: 85%;
+            max-width: 400px;
             display: flex;
             flex-direction: column;
-            align-items: stretch;
             gap: 20px;
+            box-sizing: border-box;
         }
-
-        .settings-panel {
-            background: rgba(255,255,255,0.1);
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
-            text-align: center;
-        }
-
-        .settings-panel h3 {
-            margin: 0 0 20px 0;
-            font-size: 24px;
+        
+        .settings-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: var(--bg-color);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #f1c40f;
         }
 
         .settings-options {
             display: flex;
-            flex-direction: column;
-            gap: 15px;
+            flex-direction: column; /* Apilados verticalmente como solicitaste */
+            gap: 8px;
         }
 
         .setting-btn {
-            background: rgba(0,0,0,0.4);
-            color: white;
-            border: 2px solid transparent;
-            padding: 12px 30px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            width: 100%;
-        }
-
-        .setting-btn:hover:not(.disabled) {
             background: rgba(255,255,255,0.1);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.2s;
         }
 
         .setting-btn.active {
-            background: #f39c12;
-            color: #1f1c2c;
-            border-color: #f1c40f;
-            box-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
+            background: var(--brand-red);
         }
 
-        .setting-btn.disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
+        .close-settings {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        /* CONTROLES ARCADE (Fijos abajo) */
+        .arcade-area {
+            padding: 15px 10px 30px 10px;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 -5px 10px rgba(0,0,0,0.1);
+        }
+
+        .dir-row {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            width: 100%;
+        }
+
+        .dir-btn {
+            background: var(--brand-red);
+            color: white;
+            border: 4px solid #c0392b;
+            border-radius: 50%;
+            width: 75px;
+            height: 75px;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 0 #922b21;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.05s, box-shadow 0.05s;
+        }
+
+        .dir-btn:active, .dir-btn.pressed {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #922b21;
         }
     </style>
 </head>
 <body>
-    <div class="main-layout">
-        <div class="game-column">
-            <h1 class="logo">SNAKE 67</h1>
-            
-            <div class="game-container">
-                <div id="score-board">
-                    <div class="score-box">Puntos: <span id="score">0</span></div>
-                    <div class="score-box">Tiempo: <span id="timer">00:00</span></div>
-                    <div class="score-box">Mejor: <span id="high-score">0</span></div>
-                </div>
-                <!-- Canvas fijo de 600x600, los casilleros cambian según el tamaño elegido -->
-                <canvas id="gameCanvas" width="600" height="600"></canvas>
-                <div class="overlay" id="game-over">
-                    <h2>mamaste</h2>
-                    <button class="btn-action" onclick="resetGame()">volver a mamar</button>
-                </div>
-            </div>
+    
+    <div class="top-bar">
+        <h1 class="logo">SNAKE 67</h1>
+        <button class="btn-settings" onclick="openSettings()">⚙️</button>
+    </div>
 
-            <div class="controls-hint">Usa las flechas del teclado para jugar</div>
+    <div id="score-board">
+        <span>Puntos: <span id="score">0</span></span>
+        <span>Tiempo: <span id="timer">00:00</span></span>
+        <span>Mejor: <span id="high-score">0</span></span>
+    </div>
+
+    <div class="game-area">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        
+        <!-- Game Over -->
+        <div class="overlay" id="game-over">
+            <h2>mamaste</h2>
+            <button class="btn-action" onclick="resetGame()">volver a mamar</button>
         </div>
-
-        <div class="sidebar-column">
-            <div class="settings-panel">
-                <h3>Velocidad</h3>
-                <div class="settings-options">
-                    <button class="setting-btn speed-btn" id="btn-speed-slow" onclick="setSpeed('slow')">Lenta</button>
-                    <button class="setting-btn speed-btn active" id="btn-speed-medium" onclick="setSpeed('medium')">Media</button>
-                    <button class="setting-btn speed-btn" id="btn-speed-fast" onclick="setSpeed('fast')">Alta</button>
+        
+        <!-- Menú de Ajustes -->
+        <div class="overlay" id="settings-overlay">
+            <div class="settings-modal">
+                <div class="settings-section">
+                    <h3>Velocidad</h3>
+                    <div class="settings-options">
+                        <button class="setting-btn speed-btn" id="btn-speed-slow" onclick="setSpeed('slow')">Lenta</button>
+                        <button class="setting-btn speed-btn active" id="btn-speed-medium" onclick="setSpeed('medium')">Media</button>
+                        <button class="setting-btn speed-btn" id="btn-speed-fast" onclick="setSpeed('fast')">Alta</button>
+                    </div>
                 </div>
-            </div>
-
-            <div class="settings-panel">
-                <h3>Mapa</h3>
-                <div class="settings-options">
-                    <button class="setting-btn size-btn" id="btn-size-small" onclick="setSize('small')">Pequeño</button>
-                    <button class="setting-btn size-btn active" id="btn-size-medium" onclick="setSize('medium')">Mediano</button>
-                    <button class="setting-btn size-btn" id="btn-size-large" onclick="setSize('large')">Grande</button>
+                <div class="settings-section">
+                    <h3>Tamaño del Mapa</h3>
+                    <div class="settings-options">
+                        <button class="setting-btn size-btn" id="btn-size-small" onclick="setSize('small')">Pequeño</button>
+                        <button class="setting-btn size-btn active" id="btn-size-medium" onclick="setSize('medium')">Mediano</button>
+                        <button class="setting-btn size-btn" id="btn-size-large" onclick="setSize('large')">Grande</button>
+                    </div>
                 </div>
+                <button class="close-settings" onclick="closeSettings()">Guardar y Cerrar</button>
             </div>
+        </div>
+    </div>
+
+    <div class="arcade-area">
+        <button class="dir-btn up" onmousedown="processInput('ArrowUp', this)" ontouchstart="processInput('ArrowUp', this); event.preventDefault();">▲</button>
+        <div class="dir-row">
+            <button class="dir-btn left" onmousedown="processInput('ArrowLeft', this)" ontouchstart="processInput('ArrowLeft', this); event.preventDefault();">◀</button>
+            <button class="dir-btn down" onmousedown="processInput('ArrowDown', this)" ontouchstart="processInput('ArrowDown', this); event.preventDefault();">▼</button>
+            <button class="dir-btn right" onmousedown="processInput('ArrowRight', this)" ontouchstart="processInput('ArrowRight', this); event.preventDefault();">▶</button>
         </div>
     </div>
 
@@ -249,8 +297,8 @@
         const highScoreElement = document.getElementById("high-score");
         const timerElement = document.getElementById("timer");
         const gameOverOverlay = document.getElementById("game-over");
+        const settingsOverlay = document.getElementById("settings-overlay");
 
-        // Configuraciones de tamaño del mapa
         const sizeSettings = {
             small: { tileCount: 20, tileSize: 30 },
             medium: { tileCount: 40, tileSize: 15 },
@@ -260,7 +308,6 @@
         let tileCount = sizeSettings.medium.tileCount;
         let tileSize = sizeSettings.medium.tileSize;
 
-        // Configuraciones de velocidad
         const speedSettings = {
             slow: 150,
             medium: 100,
@@ -281,14 +328,23 @@
         let gameLoopTimeout;
         let gameOver = false;
         let gameStarted = false;
+        let settingsOpen = false;
         
-        // Variables para el cronómetro
         let startTime = 0;
         let timerInterval = null;
         let elapsedTime = 0;
-
-        // Evitar cambios rápidos de dirección
         let changingDirection = false; 
+
+        function openSettings() {
+            if (gameStarted && !gameOver) return; // Bloqueado al jugar
+            settingsOverlay.classList.add('active');
+            settingsOpen = true;
+        }
+
+        function closeSettings() {
+            settingsOverlay.classList.remove('active');
+            settingsOpen = false;
+        }
 
         function updateHighScoreDisplay() {
             const key = `snakeHighScore_${currentSpeedMode}_${currentSizeMode}`;
@@ -297,8 +353,6 @@
         }
 
         function setSpeed(mode) {
-            if (gameStarted && !gameOver) return; // Bloqueado mientras juegas
-            
             currentSpeedMode = mode;
             gameSpeedBase = speedSettings[mode];
             gameSpeed = gameSpeedBase;
@@ -309,8 +363,6 @@
         }
 
         function setSize(mode) {
-            if (gameStarted && !gameOver) return; // Bloqueado mientras juegas
-            
             currentSizeMode = mode;
             tileCount = sizeSettings[mode].tileCount;
             tileSize = sizeSettings[mode].tileSize;
@@ -318,15 +370,19 @@
             document.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('btn-size-' + mode).classList.add('active');
             updateHighScoreDisplay();
-            initGame(); // Reinicia el mapa para ver los cambios
+            initGame(); 
         }
 
         function updateSettingsUI() {
             const isPlaying = gameStarted && !gameOver;
-            document.querySelectorAll('.setting-btn').forEach(btn => {
-                if (isPlaying) btn.classList.add('disabled');
-                else btn.classList.remove('disabled');
-            });
+            const gearBtn = document.querySelector('.btn-settings');
+            if (isPlaying) {
+                gearBtn.style.opacity = '0.3';
+                gearBtn.style.cursor = 'not-allowed';
+            } else {
+                gearBtn.style.opacity = '1';
+                gearBtn.style.cursor = 'pointer';
+            }
         }
 
         function updateTimer() {
@@ -357,7 +413,6 @@
         }
 
         function initGame() {
-            // Iniciar en el centro del mapa
             snake = [{ x: Math.floor(tileCount / 2), y: Math.floor(tileCount / 2) }];
             dx = 0;
             dy = 0;
@@ -404,7 +459,7 @@
             ctx.lineWidth = 1;
             ctx.strokeStyle = '#f39c12';
             ctx.stroke();
-            ctx.fillStyle = '#f1c40f'; // Estrella amarilla
+            ctx.fillStyle = '#f1c40f'; 
             ctx.fill();
         }
 
@@ -443,11 +498,10 @@
         }
 
         function clearScreen() {
-            ctx.fillStyle = "#808080"; // Piso gris
+            ctx.fillStyle = "#808080"; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Dibujar cuadriculado para saber en qué cuadro exacto estás
-            ctx.strokeStyle = "#959595"; // Gris un poco más claro
+            ctx.strokeStyle = "#959595";
             ctx.lineWidth = 1;
             
             ctx.beginPath();
@@ -465,7 +519,6 @@
         function drawSnake() {
             for (let i = 0; i < snake.length; i++) {
                 let part = snake[i];
-                // Cabeza un poco más oscura
                 ctx.fillStyle = i === 0 ? "#b30000" : "#ff3333"; 
                 
                 ctx.beginPath();
@@ -494,19 +547,11 @@
                     localStorage.setItem(key, highScore);
                 }
                 
-                // Aumentar velocidad ligeramente al comer
                 gameSpeed = Math.max(30, gameSpeed - 2);
-                
                 placeFood();
             } else {
                 snake.pop(); 
             }
-        }
-
-        function drawFood() {
-            const cx = foodX * tileSize + tileSize / 2;
-            const cy = foodY * tileSize + tileSize / 2;
-            drawStar(cx, cy, 5, tileSize / 2 - 1, tileSize / 4);
         }
 
         function checkGameOver() {
@@ -514,12 +559,10 @@
 
             const head = snake[0];
             
-            // Choque con paredes
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
                 return true;
             }
             
-            // Choque consigo misma
             for (let i = 1; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
                     return true;
@@ -532,7 +575,7 @@
         function handleGameOver() {
             gameOver = true;
             stopTimer();
-            updateSettingsUI(); // Volver a habilitar botones de configuración
+            updateSettingsUI();
             gameOverOverlay.classList.add('active');
         }
 
@@ -541,13 +584,14 @@
             initGame();
         }
 
-        document.body.addEventListener('keydown', (event) => {
+        function processInput(key, btnElem) {
+            if (settingsOpen) return;
             if (changingDirection) return;
 
-            const key = event.key;
-            
-            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(key)) {
-                event.preventDefault();
+            // Feedback visual del botón si se presiona
+            if (btnElem) {
+                btnElem.classList.add('pressed');
+                setTimeout(() => btnElem.classList.remove('pressed'), 100);
             }
 
             const goingUp = dy === -1;
@@ -570,10 +614,18 @@
                 changingDirection = true;
                 if (!gameStarted) {
                     gameStarted = true;
-                    updateSettingsUI(); // Bloquear botones de configuración
+                    updateSettingsUI(); 
                     startTimer(); 
                     gameLoop();
                 }
+            }
+        }
+
+        document.body.addEventListener('keydown', (event) => {
+            const key = event.key;
+            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(key)) {
+                event.preventDefault();
+                processInput(key, null);
             }
         });
 
