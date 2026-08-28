@@ -44,15 +44,21 @@ function getRandomColor(usedColors) {
   return available.length > 0 ? available[0] : COLORS[Math.floor(Math.random() * COLORS.length)];
 }
 
+// Posiciones y direcciones iniciales por jugador (esquinas, apuntando al centro)
+const CORNER_CONFIGS = [
+  // [headX, headY, dx, dy]  — cuerpo va DETRÁS (opuesto a dx/dy)
+  { x: 3,            y: 3,            dx: 1,  dy: 0  }, // esquina top-left → derecha
+  { x: TILE_COUNT-4, y: TILE_COUNT-4, dx: -1, dy: 0  }, // esquina bottom-right → izquierda
+  { x: TILE_COUNT-4, y: 3,            dx: -1, dy: 0  }, // esquina top-right → izquierda
+  { x: 3,            y: TILE_COUNT-4, dx: 1,  dy: 0  }, // esquina bottom-left → derecha
+];
+
 function createInitialSnake(index) {
-  const startX = index === 0 ? 10 : TILE_COUNT - 11;
-  const startY = Math.floor(TILE_COUNT / 2);
-  const movingRight = index % 2 === 0; // jugadores pares van a la derecha, impares a la izquierda
-  const bodyOffset = movingRight ? -1 : 1; // el cuerpo va DETRÁS de la cabeza
+  const cfg = CORNER_CONFIGS[index % CORNER_CONFIGS.length];
   return [
-    { x: startX,               y: startY },
-    { x: startX + bodyOffset,  y: startY },
-    { x: startX + bodyOffset * 2, y: startY }
+    { x: cfg.x,               y: cfg.y },
+    { x: cfg.x - cfg.dx,     y: cfg.y - cfg.dy },
+    { x: cfg.x - cfg.dx * 2, y: cfg.y - cfg.dy * 2 }
   ];
 }
 
@@ -173,10 +179,11 @@ io.on('connection', (socket) => {
     rooms[roomId] = { players: {}, food: { x: 20, y: 20 }, gameLoop: null, started: false };
 
     const color = getRandomColor([]);
+    const cfg = CORNER_CONFIGS[0];
     rooms[roomId].players[socket.id] = {
       name: playerName || 'Jugador 1',
       snake: createInitialSnake(0),
-      dx: 1, dy: 0,
+      dx: cfg.dx, dy: cfg.dy,
       score: 0,
       color,
       alive: true
@@ -197,11 +204,12 @@ io.on('connection', (socket) => {
     const usedColors = Object.values(room.players).map(p => p.color);
     const color = getRandomColor(usedColors);
     const playerIndex = Object.keys(room.players).length;
+    const cfg = CORNER_CONFIGS[playerIndex % CORNER_CONFIGS.length];
 
     room.players[socket.id] = {
       name: playerName || `Jugador ${playerIndex + 1}`,
       snake: createInitialSnake(playerIndex),
-      dx: playerIndex % 2 === 0 ? 1 : -1, dy: 0,
+      dx: cfg.dx, dy: cfg.dy,
       score: 0,
       color,
       alive: true
@@ -258,9 +266,10 @@ io.on('connection', (socket) => {
     // Reiniciar estado de todos los jugadores
     let idx = 0;
     for (const [sid, p] of Object.entries(room.players)) {
+      const cfg = CORNER_CONFIGS[idx % CORNER_CONFIGS.length];
       p.snake = createInitialSnake(idx);
-      p.dx = idx % 2 === 0 ? 1 : -1;
-      p.dy = 0;
+      p.dx = cfg.dx;
+      p.dy = cfg.dy;
       p.score = 0;
       p.alive = true;
       idx++;
