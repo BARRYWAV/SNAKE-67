@@ -51,7 +51,7 @@ function createInitialSnake(index) {
 }
 
 function placeFood(players, zoneLevel = 0) {
-  const margin = zoneLevel; // food sólo dentro del área segura
+  const margin = zoneLevel + 1; // +1 buffer de seguridad: la comida nunca toca el borde de la zona
   const min = margin;
   const max = TILE_COUNT - margin - 1;
   // Si el área segura es demasiado pequeña, usar toda la cuadrícula
