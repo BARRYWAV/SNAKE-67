@@ -142,3 +142,19 @@ async def ws_endpoint(websocket: WebSocket):
         if room:
             room.remove_player(player_id)
         _clean_empty_rooms()
+
+# ── Serve Static React Frontend ───────────────────────────────────────────────
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
+if os.path.exists(frontend_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+
+    @app.get("/{catchall:path}")
+    def serve_react_app(catchall: str):
+        file_path = os.path.join(frontend_dist, catchall)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
