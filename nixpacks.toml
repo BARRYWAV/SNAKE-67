@@ -6,8 +6,8 @@ NIXPACKS_NODE_VERSION = "22"
 
 [phases.install]
 cmds = [
-    "python -m venv /opt/venv",
-    ". /opt/venv/bin/activate && pip install -r backend/requirements.txt",
+    "python -m venv /app/.venv",
+    "/app/.venv/bin/pip install -r backend/requirements.txt",
     "rm -rf frontend/node_modules frontend/package-lock.json",
     "npm install --prefix frontend --include=optional",
     "npm install --prefix frontend @rolldown/binding-linux-x64-gnu --no-save"
@@ -19,4 +19,4 @@ cmds = [
 ]
 
 [start]
-cmd = ". /opt/venv/bin/activate && cd backend && python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "cd backend && /app/.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
