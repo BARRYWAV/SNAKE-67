@@ -12,11 +12,11 @@ export const audioContext = {
 if (typeof window !== 'undefined') {
   if (audioContext.menu_song) {
     audioContext.menu_song.loop = true;
-    audioContext.menu_song.volume = 0.5;
+    audioContext.menu_song.volume = 1.0;
   }
   if (audioContext.game_song) {
     audioContext.game_song.loop = true;
-    audioContext.game_song.volume = 0.5;
+    audioContext.game_song.volume = 1.0;
   }
 }
 
