@@ -13,7 +13,7 @@ export default function Scoreboard({ players, myId, winScore, isSolo }) {
         >
           <span className="tracking-wide">{p.name}</span>
           <span className="opacity-80">
-            {p.score}{winScore ? `/${winScore}` : ''}
+            {p.score}{winScore && !isSolo ? `/${winScore}` : ''}
           </span>
           {!p.alive && <span>💀</span>}
         </div>

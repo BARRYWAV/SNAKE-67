@@ -7,6 +7,21 @@ export default function GameScreen({ gameState, myId, isSolo, sendInput, countdo
   const containerRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState(300);
   const [isMobile, setIsMobile]     = useState(false);
+  const [soloHighScore, setSoloHighScore] = useState(null);
+
+  // Fetch top solo score if isSolo
+  useEffect(() => {
+    if (isSolo) {
+      fetch('/api/records/solo')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.length > 0) {
+            setSoloHighScore(data[0]); // highest score
+          }
+        })
+        .catch(err => console.error(err));
+    }
+  }, [isSolo]);
 
   // ── Responsive canvas size ─────────────────────────────────────────────────
   useEffect(() => {
@@ -82,11 +97,15 @@ export default function GameScreen({ gameState, myId, isSolo, sendInput, countdo
       <div className="bg-black/50 border-b border-white/5 flex-shrink-0 z-10">
         <div className="flex items-center justify-between px-3 py-1">
           <span className="font-impact text-[#CF010B] text-lg tracking-widest">KILLER SNAKE</span>
-          {!isSolo && (
+          {!isSolo ? (
             <span className="text-xs text-neutral-600 tracking-widest uppercase">
               🏆 Meta: {winScore} pts
             </span>
-          )}
+          ) : soloHighScore ? (
+            <span className="text-xs text-neutral-500 tracking-widest uppercase">
+              🏆 Mejor Score: <strong className="text-[#f1c40f]">{soloHighScore.score}</strong> ({soloHighScore.name})
+            </span>
+          ) : null}
         </div>
         <Scoreboard players={players} myId={myId} winScore={winScore} isSolo={isSolo} />
       </div>
@@ -116,6 +135,7 @@ export default function GameScreen({ gameState, myId, isSolo, sendInput, countdo
             gameState={gameState}
             myId={myId}
             size={canvasSize}
+            isSolo={isSolo}
           />
           
           {/* Countdown Overlay */}

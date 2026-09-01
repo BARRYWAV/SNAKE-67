@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 
 // New dark tones for the grid (lighter contrast)
 const COLORS = {
-  tile_a:  '#1e1e1e',
-  tile_b:  '#242424',
+  tile_a:  '#2a2a2a',
+  tile_b:  '#333333',
   zone:    'rgba(180,0,0,0.55)',
   zone_border: '#CF010B',
   food:    '#f1c40f',
   food_rim:'#d4ac0d',
 };
 
-export default function GameCanvas({ gameState, myId, size }) {
+export default function GameCanvas({ gameState, myId, size, isSolo }) {
   const canvasRef = useRef(null);
   const [identityActive, setIdentityActive] = useState(true);
   
@@ -152,19 +152,22 @@ export default function GameCanvas({ gameState, myId, size }) {
         
         // 1. Render Neon Border
         ctx.strokeStyle = p.color;
-        if (isMe && identityActive) {
-           ctx.shadowColor = '#f1c40f';
-           ctx.shadowBlur = 20;
-           ctx.globalCompositeOperation = 'lighter';
+        if (isMe && identityActive && !isSolo) {
+           // Blink effect
+           if (Math.sin(now / 100) > 0) {
+             ctx.shadowColor = '#f1c40f';
+             ctx.shadowBlur = 25;
+             ctx.globalCompositeOperation = 'lighter';
+           }
         }
         ctx.stroke();
         
         ctx.shadowBlur = 0;
         ctx.globalCompositeOperation = 'source-over';
 
-        // 2. Render Dark Core (Neon Aesthetic)
+        // 2. Render Light Core (Neon Aesthetic)
         ctx.lineWidth = tile * 0.45;
-        ctx.strokeStyle = '#111111'; 
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; 
         ctx.stroke();
 
         // 3. Render Solid Bright Head
@@ -172,17 +175,21 @@ export default function GameCanvas({ gameState, myId, size }) {
         ctx.arc(headX * tile + tile / 2, headY * tile + tile / 2, tile * 0.45, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fill(); // Lighter head center
 
         // 4. Glass Names
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.font = `600 ${Math.max(6, tile * 0.4)}px Inter`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(
-          p.name.length > 8 ? p.name.slice(0, 7) + '…' : p.name,
-          headX * tile + tile / 2,
-          headY * tile - 4
-        );
+        if (!isSolo) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+          ctx.font = `600 ${Math.max(6, tile * 0.4)}px Inter`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(
+            p.name.length > 8 ? p.name.slice(0, 7) + '…' : p.name,
+            headX * tile + tile / 2,
+            headY * tile - 4
+          );
+        }
       }
 
       rafRef.current = requestAnimationFrame(render);
@@ -190,7 +197,7 @@ export default function GameCanvas({ gameState, myId, size }) {
 
     rafRef.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [size, identityActive, myId]); 
+  }, [size, identityActive, myId, isSolo]); 
 
   return (
     <canvas

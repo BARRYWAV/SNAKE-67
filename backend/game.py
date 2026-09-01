@@ -192,9 +192,7 @@ class GameRoom:
         for idx, player in enumerate(self.players.values()):
             if self.solo:
                 player.snake = [
-                    {"x": self.grid_size // 2, "y": self.grid_size // 2},
-                    {"x": self.grid_size // 2, "y": self.grid_size // 2 + 1},
-                    {"x": self.grid_size // 2, "y": self.grid_size // 2 + 2},
+                    {"x": self.grid_size // 2, "y": self.grid_size // 2}
                 ]
                 player.dx    = 0
                 player.dy    = 0
@@ -262,13 +260,6 @@ class GameRoom:
             if self._in_zone(hx, hy):
                 p.alive = False; continue
 
-            # Colisión propia
-            if any(s["x"] == hx and s["y"] == hy for s in p.snake):
-                # Wait, if we haven't popped the tail yet, the tail might move out of the way.
-                # In standard snake, if the head moves to where the tail currently is, it's NOT a collision UNLESS we just ate food.
-                # To be precise, we pop first, then check, then push. Or just exclude the last segment if we didn't eat.
-                pass
-                
             new_head = {"x": hx, "y": hy}
             
             # Check if we ate food
@@ -312,11 +303,12 @@ class GameRoom:
         alive     = [p for p in self.players.values() if p.alive]
         total     = len(self.players)
 
-        # Victoria por puntos
-        for p in self.players.values():
-            if p.score >= WIN_SCORE:
-                await self._end_game(winner=p)
-                return
+        # Victoria por puntos (Solo en VS)
+        if not self.solo:
+            for p in self.players.values():
+                if p.score >= WIN_SCORE:
+                    await self._end_game(winner=p)
+                    return
 
         # Victoria por supervivencia
         if total >= 2 and len(alive) <= 1:
@@ -324,6 +316,7 @@ class GameRoom:
             await self._end_game(winner=winner)
             return
 
+        # Fin de partida en solo (cuando muere el único jugador)
         if total == 1 and len(alive) == 0:
             await self._end_game(winner=None)
 
