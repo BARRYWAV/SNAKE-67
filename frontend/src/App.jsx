@@ -3,12 +3,13 @@ import MainMenu  from './components/MainMenu';
 import Lobby     from './components/Lobby';
 import GameScreen from './components/GameScreen';
 import GameOver  from './components/GameOver';
+import Records   from './components/Records';
 
 export default function App() {
   const {
     screen, myId, roomId, isHost, isSolo,
     gameState, lobbyPlayers, endData, countdown, emotes,
-    quickPlay, playSolo, startGame, sendInput, sendEmote, rematch, backToMenu,
+    quickPlay, playSolo, startGame, sendInput, sendEmote, rematch, backToMenu, viewRecords,
   } = useGameSocket();
 
   return (
@@ -17,7 +18,12 @@ export default function App() {
         <MainMenu
           onQuickPlay={quickPlay}
           onSolo={playSolo}
+          onRecords={viewRecords}
         />
+      )}
+
+      {screen === 'records' && (
+        <Records onBack={backToMenu} />
       )}
 
       {screen === 'lobby' && (

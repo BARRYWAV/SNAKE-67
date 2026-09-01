@@ -119,8 +119,11 @@ export function useGameSocket() {
   const sendInput  = useCallback((key) => send({ type: 'input', key }), [send]);
   const sendEmote  = useCallback((emote) => send({ type: 'emote', emote }), [send]);
   const rematch    = useCallback(() => send({ type: 'rematch' }), [send]);
+  const viewRecords = useCallback(() => setScreen('records'), []);
   const backToMenu = useCallback(() => {
-    wsRef.current?.close();
+    if (wsRef.current?.readyState === WebSocket.OPEN && screen !== 'records') {
+        wsRef.current.close();
+    }
     setScreen('menu');
     setGameState(null);
     setEndData(null);
@@ -129,12 +132,14 @@ export function useGameSocket() {
     setRoomId(null);
     setCountdown(null);
     setEmotes([]);
-    setTimeout(connect, 200);
-  }, [connect]);
+    if (screen !== 'records') {
+        setTimeout(connect, 200);
+    }
+  }, [connect, screen]);
 
   return {
     connected, screen, myId, roomId, isHost, isSolo,
     gameState, lobbyPlayers, endData, countdown, emotes,
-    quickPlay, playSolo, startGame, sendInput, sendEmote, rematch, backToMenu,
+    quickPlay, playSolo, startGame, sendInput, sendEmote, rematch, backToMenu, viewRecords,
   };
 }

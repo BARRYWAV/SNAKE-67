@@ -9,14 +9,25 @@ function generateRandomName() {
   return result;
 }
 
-export default function MainMenu({ onQuickPlay, onSolo }) {
+export default function MainMenu({ onQuickPlay, onSolo, onRecords }) {
   const [name, setName] = useState('');
   const [diff, setDiff] = useState('medium');
   const [mode, setMode] = useState(null); // null | 'solo'
 
   useEffect(() => {
-    setName(generateRandomName());
+    const saved = localStorage.getItem('killer_snake_name');
+    if (saved) {
+      setName(saved);
+    } else {
+      setName(generateRandomName());
+    }
   }, []);
+
+  const handleNameChange = (val) => {
+    const newName = val.toUpperCase().slice(0, 3);
+    setName(newName);
+    localStorage.setItem('killer_snake_name', newName);
+  };
 
   const difficulties = [
     { id: 'easy',   label: 'Fácil' },
@@ -49,7 +60,7 @@ export default function MainMenu({ onQuickPlay, onSolo }) {
               maxLength={3}
               placeholder="FOU"
               value={name}
-              onChange={e => setName(e.target.value.toUpperCase().slice(0, 3))}
+              onChange={e => handleNameChange(e.target.value)}
             />
           </div>
         )}
@@ -84,24 +95,33 @@ export default function MainMenu({ onQuickPlay, onSolo }) {
             </button>
           </div>
         ) : (
-          <div className="flex gap-3 mt-2">
+          <div className="flex flex-col gap-3 mt-2">
+            <div className="flex gap-3">
+              <button
+                className="flex-1 py-4 rounded-2xl bg-[#CF010B] hover:bg-[#a00008] active:scale-95 font-bold text-lg tracking-widest transition-all shadow-lg shadow-[#CF010B]/40 text-white"
+                onClick={() => onQuickPlay(name || 'FOU')}
+              >
+                VS
+              </button>
+              <button
+                className="flex-1 py-4 rounded-2xl border border-white/10 hover:bg-white/5 active:scale-95 font-bold text-lg tracking-widest transition-all text-neutral-300"
+                onClick={() => setMode('solo')}
+              >
+                SOLO
+              </button>
+            </div>
+            
             <button
-              className="flex-1 py-4 rounded-2xl bg-[#CF010B] hover:bg-[#a00008] active:scale-95 font-bold text-lg tracking-widest transition-all shadow-lg shadow-[#CF010B]/40 text-white"
-              onClick={() => onQuickPlay(name || 'FOU')}
+              className="w-full py-3 rounded-xl border border-white/5 bg-black/40 hover:bg-white/5 active:scale-95 font-bold text-sm tracking-widest transition-all text-neutral-400"
+              onClick={onRecords}
             >
-              VS
-            </button>
-            <button
-              className="flex-1 py-4 rounded-2xl border border-white/10 hover:bg-white/5 active:scale-95 font-bold text-lg tracking-widest transition-all text-neutral-300"
-              onClick={() => setMode('solo')}
-            >
-              SOLO
+              🏆 RÉCORDS
             </button>
           </div>
         )}
       </div>
 
-      <p className="relative text-neutral-700 text-xs">v2.0 · KILLER SNAKE</p>
+      <p className="relative text-neutral-700 text-xs">v2.1 · KILLER SNAKE</p>
     </div>
   );
 }

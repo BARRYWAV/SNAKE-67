@@ -153,10 +153,18 @@ async def ws_endpoint(websocket: WebSocket):
             room.remove_player(player_id)
         _clean_empty_rooms()
 
-# ── Serve Static React Frontend ───────────────────────────────────────────────
 import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+import db
+
+@app.get("/api/records/solo")
+def get_solo_records():
+    return db.get_top_solo()
+
+@app.get("/api/records/vs")
+def get_vs_records():
+    return db.get_top_vs()
 
 frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
 if os.path.exists(frontend_dist):

@@ -8,7 +8,7 @@ export default function GameOver({ endData, isSolo, onRematch, onMenu }) {
 
       <div className="relative text-center">
         <h1 className="font-impact text-6xl tracking-widest text-white drop-shadow-md">
-          {winner ? 'GAME OVER' : 'FIN DE PARTIDA'}
+          GAME OVER
         </h1>
         {winner && !isSolo && (
           <p className="text-white text-xl font-bold mt-2 tracking-widest uppercase">
@@ -35,7 +35,10 @@ export default function GameOver({ endData, isSolo, onRematch, onMenu }) {
           className="flex-1 py-4 rounded-2xl bg-[#CF010B] hover:bg-[#a00008] active:scale-95 text-white font-bold tracking-widest transition-all shadow-lg shadow-[#CF010B]/40 flex items-center justify-center text-xl"
           onClick={onRematch}
         >
-          🔁
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
         </button>
         <button
           className="flex-1 py-4 rounded-2xl border border-white/10 hover:bg-white/5 active:scale-95 text-white font-bold tracking-widest transition-all uppercase flex items-center justify-center text-sm"

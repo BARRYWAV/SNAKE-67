@@ -11,15 +11,6 @@ export default function Lobby({ roomId, players, isHost, onStart }) {
 
       <div className="relative glass p-6 w-full max-w-sm flex flex-col gap-5">
 
-        {/* Room code */}
-        <div className="text-center">
-          <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1">Código de sala</p>
-          <div className="text-3xl font-impact tracking-[0.3em] text-white">{roomId}</div>
-          <p className="text-xs text-neutral-600 mt-1">Comparte este código con tus amigos</p>
-        </div>
-
-        <hr className="border-white/10" />
-
         {/* Players list */}
         <div className="flex flex-col gap-2">
           <p className="text-xs text-neutral-500 uppercase tracking-widest">Jugadores ({players.length}/4)</p>

@@ -13,9 +13,9 @@ ZONE_MAX  = 8   # máximo tiles que puede crecer la zona por lado
 PLAYER_COLORS = ["#CF010B", "#2ecc71", "#9b59b6", "#3498db"]  # P1 P2 P3 P4
 
 SPEED_MAP = {
-    "easy":   150,
-    "medium": 100,
-    "hard":    60,
+    "easy":   120,
+    "medium": 90,
+    "hard":    65,
 }
 
 def get_corner_config(index: int, grid_size: int):
@@ -34,12 +34,20 @@ class Player:
         self.color    = PLAYER_COLORS[index % len(PLAYER_COLORS)]
         
         if solo:
-            self.snake = [{"x": grid_size // 2, "y": grid_size // 2}]
+            self.snake = [
+                {"x": grid_size // 2, "y": grid_size // 2},
+                {"x": grid_size // 2, "y": grid_size // 2 + 1},
+                {"x": grid_size // 2, "y": grid_size // 2 + 2},
+            ]
             self.dx    = 0
             self.dy    = 0
         else:
             cfg = get_corner_config(index, grid_size)
-            self.snake = [{"x": cfg["x"], "y": cfg["y"]}]
+            self.snake = [
+                {"x": cfg["x"], "y": cfg["y"]},
+                {"x": cfg["x"] - cfg["dx"], "y": cfg["y"] - cfg["dy"]},
+                {"x": cfg["x"] - cfg["dx"] * 2, "y": cfg["y"] - cfg["dy"] * 2},
+            ]
             self.dx    = cfg["dx"]
             self.dy    = cfg["dy"]
 
@@ -62,9 +70,16 @@ class Player:
         if key not in moves:
             return
         ndx, ndy = moves[key]
-        # No revertir dirección (solo si ya estamos en movimiento)
+        
+        # Prevent reversing when moving
         if (self.dx != 0 or self.dy != 0) and ndx == -self.dx and ndy == -self.dy:
             return
+        # Prevent moving into own body when stationary (initial solo spawn)
+        elif self.dx == 0 and self.dy == 0 and len(self.snake) > 1:
+            next_x, next_y = self.snake[0]["x"] + ndx, self.snake[0]["y"] + ndy
+            if next_x == self.snake[1]["x"] and next_y == self.snake[1]["y"]:
+                return
+                
         self.pending_dx = ndx
         self.pending_dy = ndy
 
@@ -120,6 +135,7 @@ class GameRoom:
 
         occupied = set()
         for p in self.players.values():
+            if not p.alive: continue
             for seg in p.snake:
                 occupied.add((seg["x"], seg["y"]))
 
@@ -160,24 +176,35 @@ class GameRoom:
         self._reset_snakes()
         self._place_food()
         self.zone_level = 0
-        tick_ms = SPEED_MAP.get(self.difficulty, 100) / 1000
-
+        
+        # Emit initial state so clients can render the board during countdown
+        initial_tick_s = SPEED_MAP.get(self.difficulty, 90) / 1000.0 if self.solo else 150 / 1000.0
+        await self._broadcast_state(initial_tick_s)
+        
         if not self.solo:
             for i in [3, 2, 1, "KILL"]:
                 await self._broadcast({"type": "countdown", "value": i})
                 await asyncio.sleep(1)
 
-        self._task = asyncio.create_task(self._loop(tick_ms))
+        self._task = asyncio.create_task(self._loop())
 
     def _reset_snakes(self):
         for idx, player in enumerate(self.players.values()):
             if self.solo:
-                player.snake = [{"x": self.grid_size // 2, "y": self.grid_size // 2}]
+                player.snake = [
+                    {"x": self.grid_size // 2, "y": self.grid_size // 2},
+                    {"x": self.grid_size // 2, "y": self.grid_size // 2 + 1},
+                    {"x": self.grid_size // 2, "y": self.grid_size // 2 + 2},
+                ]
                 player.dx    = 0
                 player.dy    = 0
             else:
                 cfg = get_corner_config(idx, self.grid_size)
-                player.snake = [{"x": cfg["x"], "y": cfg["y"]}]
+                player.snake = [
+                    {"x": cfg["x"], "y": cfg["y"]},
+                    {"x": cfg["x"] - cfg["dx"], "y": cfg["y"] - cfg["dy"]},
+                    {"x": cfg["x"] - cfg["dx"] * 2, "y": cfg["y"] - cfg["dy"] * 2},
+                ]
                 player.dx    = cfg["dx"]
                 player.dy    = cfg["dy"]
             
@@ -186,15 +213,21 @@ class GameRoom:
             player.pending_dx = None
             player.pending_dy = None
 
-    async def _loop(self, tick_s: float):
+    async def _loop(self):
         try:
             while self.started and not self.finished:
-                await asyncio.sleep(tick_s)
-                await self._tick()
+                if self.solo:
+                    current_tick_s = SPEED_MAP.get(self.difficulty, 90) / 1000.0
+                else:
+                    current_tick_ms = max(50, 150 - (self.zone_level * 10))
+                    current_tick_s = current_tick_ms / 1000.0
+                    
+                await asyncio.sleep(current_tick_s)
+                await self._tick(current_tick_s)
         except asyncio.CancelledError:
             pass
 
-    async def _tick(self):
+    async def _tick(self, current_tick_s: float):
         self.tick_count += 1
         self.zone_level = self._calc_zone()
 
@@ -218,41 +251,53 @@ class GameRoom:
             if p.dx == 0 and p.dy == 0:
                 continue
 
-            new_head = {"x": p.snake[0]["x"] + p.dx, "y": p.snake[0]["y"] + p.dy}
-            p.snake.insert(0, new_head)
+            hx = p.snake[0]["x"] + p.dx
+            hy = p.snake[0]["y"] + p.dy
 
-            hx, hy = new_head["x"], new_head["y"]
-
-            # Colisión pared
+            # Colisión pared (Visualmente precisa: la cabeza no se renderiza fuera de la malla)
             if hx < 0 or hx >= self.grid_size or hy < 0 or hy >= self.grid_size:
-                p.alive = False; p.snake.pop(); continue
+                p.alive = False; continue
 
             # Colisión zona venenosa
             if self._in_zone(hx, hy):
-                p.alive = False; p.snake.pop(); continue
+                p.alive = False; continue
 
             # Colisión propia
-            if any(s["x"] == hx and s["y"] == hy for s in p.snake[1:]):
-                p.alive = False; p.snake.pop(); continue
+            if any(s["x"] == hx and s["y"] == hy for s in p.snake):
+                # Wait, if we haven't popped the tail yet, the tail might move out of the way.
+                # In standard snake, if the head moves to where the tail currently is, it's NOT a collision UNLESS we just ate food.
+                # To be precise, we pop first, then check, then push. Or just exclude the last segment if we didn't eat.
+                pass
+                
+            new_head = {"x": hx, "y": hy}
+            
+            # Check if we ate food
+            will_eat = (self.food and hx == self.food["x"] and hy == self.food["y"])
+            
+            if not will_eat:
+                p.snake.pop() # Remove tail BEFORE collision check with itself/others
+                
+            # Now check self collision
+            if any(s["x"] == hx and s["y"] == hy for s in p.snake):
+                p.alive = False; continue
 
             # Colisión con otras serpientes
             hit_other = False
             for other in self.players.values():
-                if other.id == p.id:
+                if other.id == p.id or not other.alive:
                     continue
                 if any(s["x"] == hx and s["y"] == hy for s in other.snake):
                     hit_other = True
                     break
             if hit_other:
-                p.alive = False; p.snake.pop(); continue
+                p.alive = False; continue
 
-            # Comer comida
-            if self.food and hx == self.food["x"] and hy == self.food["y"]:
+            # Movimiento válido
+            p.snake.insert(0, new_head)
+
+            if will_eat:
                 p.score += 1
                 ate_food = p.id
-                # No pop → crece
-            else:
-                p.snake.pop()
 
         if ate_food:
             self._place_food()
@@ -261,7 +306,7 @@ class GameRoom:
         await self._check_end()
 
         # Emitir estado
-        await self._broadcast_state()
+        await self._broadcast_state(current_tick_s)
 
     async def _check_end(self):
         alive     = [p for p in self.players.values() if p.alive]
@@ -288,6 +333,16 @@ class GameRoom:
         if self._task:
             self._task.cancel()
 
+        import db
+        if self.solo:
+            # Save solo score for player 0
+            p = list(self.players.values())[0]
+            db.add_solo_score(p.name, p.score, self.difficulty)
+        else:
+            # Save VS win
+            if winner:
+                db.add_vs_win(winner.name)
+
         scores = sorted(
             [{"name": p.name, "score": p.score, "color": p.color} for p in self.players.values()],
             key=lambda x: -x["score"]
@@ -301,7 +356,7 @@ class GameRoom:
 
     # ── broadcasting ──────────────────────────────────────────────────────────
 
-    async def _broadcast_state(self):
+    async def _broadcast_state(self, current_tick_s: float):
         state = {
             "type":       "game_state",
             "grid":       self.grid_size,
@@ -310,6 +365,7 @@ class GameRoom:
             "zone":       self.zone_level,
             "win_score":  WIN_SCORE,
             "tick":       self.tick_count,
+            "tick_s":     current_tick_s,
         }
         await self._broadcast(state)
 
