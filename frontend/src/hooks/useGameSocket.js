@@ -95,7 +95,7 @@ export function useGameSocket() {
         break;
 
       case 'game_over':
-        setEndData({ winner: msg.winner, scores: msg.scores });
+        setEndData({ winner: msg.winner, winnerId: msg.winner_id, scores: msg.scores });
         setScreen('gameover');
         break;
 

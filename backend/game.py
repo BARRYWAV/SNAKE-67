@@ -343,6 +343,7 @@ class GameRoom:
         msg = {
             "type":   "game_over",
             "winner": winner.name if winner else None,
+            "winner_id": winner.id if winner else None,
             "scores": scores,
         }
         await self._broadcast(msg)

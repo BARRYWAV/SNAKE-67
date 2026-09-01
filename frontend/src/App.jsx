@@ -67,6 +67,7 @@ export default function App() {
         <GameOver
           endData={endData}
           isSolo={isSolo}
+          myId={myId}
           onRematch={() => { rematch(); }}
           onMenu={backToMenu}
         />

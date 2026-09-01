@@ -1,5 +1,7 @@
-export default function GameOver({ endData, isSolo, onRematch, onMenu }) {
-  const { winner, scores } = endData || {};
+export default function GameOver({ endData, isSolo, myId, onRematch, onMenu }) {
+  const { winner, winnerId, scores } = endData || {};
+  const amIWinner = winnerId === myId;
+  const isDraw = !winnerId && !isSolo;
 
   return (
     <div className="relative flex flex-col items-center justify-center h-full gap-8 px-4 overflow-hidden">
@@ -7,27 +9,37 @@ export default function GameOver({ endData, isSolo, onRematch, onMenu }) {
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#CF010B]/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative text-center">
-        <h1 className="font-impact text-6xl tracking-widest text-white drop-shadow-md">
-          GAME OVER
-        </h1>
-        {winner && !isSolo && (
-          <p className="text-white text-xl font-bold mt-2 tracking-widest uppercase">
-            <span className="text-[#CF010B] font-impact text-2xl">{winner}</span> HA GANADO
-          </p>
+        {isSolo ? (
+           <h1 className="font-impact text-6xl tracking-widest text-white drop-shadow-md">
+             GAME OVER
+           </h1>
+        ) : amIWinner ? (
+           <h1 className="font-impact text-6xl tracking-widest text-green-500 drop-shadow-[0_0_20px_rgba(34,197,94,0.5)]">
+             YOU WIN
+           </h1>
+        ) : isDraw ? (
+           <h1 className="font-impact text-6xl tracking-widest text-yellow-500 drop-shadow-md">
+             EMPATE
+           </h1>
+        ) : (
+           <h1 className="font-impact text-6xl tracking-widest text-[#CF010B] drop-shadow-[0_0_20px_rgba(207,1,11,0.5)]">
+             GAME OVER
+           </h1>
         )}
       </div>
 
-      {/* Scores */}
-      <div className="relative glass p-6 w-full max-w-sm flex flex-col gap-4">
-        <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1 text-center">Puntajes</p>
-        {(scores || []).map((s, i) => (
-          <div key={i} className="flex items-center gap-4 py-3 px-4 rounded-xl bg-white/5 border border-white/5">
-            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ background: s.color, boxShadow: `0 0 10px ${s.color}` }} />
-            <span className="font-bold tracking-widest flex-1 text-lg">{s.name}</span>
-            <span className="text-[#f1c40f] font-impact text-2xl drop-shadow-md">{s.score} ⭐</span>
-          </div>
-        ))}
-      </div>
+      {/* Scores only for SOLO mode */}
+      {isSolo && (
+        <div className="relative glass p-6 w-full max-w-sm flex flex-col gap-4">
+          <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1 text-center">Puntaje</p>
+          {(scores || []).map((s, i) => (
+            <div key={i} className="flex items-center gap-4 py-3 px-4 rounded-xl bg-white/5 border border-white/5">
+              <span className="font-bold tracking-widest flex-1 text-lg">{s.name}</span>
+              <span className="text-[#f1c40f] font-impact text-2xl drop-shadow-md">{s.score} ⭐</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="relative flex gap-4 w-full max-w-sm">
