@@ -10,7 +10,7 @@ export default function DPad({ onInput, onEmote }) {
   };
 
   return (
-    <div className="grid grid-cols-3 grid-rows-3 gap-4 pb-safe items-center justify-items-center">
+    <div className="grid grid-cols-3 grid-rows-3 gap-4 pb-safe items-center justify-items-center dpad-container">
       <div />
       <button className="dpad-btn bg-white/10 active:bg-white/20 text-white flex items-center justify-center" onPointerDown={press('ArrowUp')}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>

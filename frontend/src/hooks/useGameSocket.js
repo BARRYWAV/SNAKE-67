@@ -2,6 +2,7 @@
  * useGameSocket — WebSocket hook para Killer Snake
  */
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { playSound } from './useAudio';
 
 const WS_URL = import.meta.env.VITE_WS_URL || (
   window.location.protocol === 'https:' ? 'wss://' : 'ws://'
@@ -9,6 +10,7 @@ const WS_URL = import.meta.env.VITE_WS_URL || (
 
 export function useGameSocket() {
   const wsRef      = useRef(null);
+  const gameStateRef = useRef(null);
   const [connected, setConnected]   = useState(false);
   const [gameState, setGameState]   = useState(null);   // { players, food, zone, grid, ... }
   const [screen, setScreen]         = useState('menu'); // menu | lobby | game | gameover
@@ -63,11 +65,26 @@ export function useGameSocket() {
       case 'game_started':
         setScreen('game');
         setGameState(null);
+        gameStateRef.current = null;
         setCountdown(null);
         break;
 
       case 'game_state':
+        // Sound logic
+        setMyId(currentMyId => {
+          if (currentMyId) {
+            const prevMe = gameStateRef.current?.players?.find(p => p.id === currentMyId);
+            const nextMe = msg.players?.find(p => p.id === currentMyId);
+            if (prevMe && nextMe) {
+               if (nextMe.score > prevMe.score) playSound('point');
+               if (prevMe.alive && !nextMe.alive) playSound('dead');
+            }
+          }
+          return currentMyId;
+        });
+        
         setGameState(msg);
+        gameStateRef.current = msg;
         break;
         
       case 'emote':

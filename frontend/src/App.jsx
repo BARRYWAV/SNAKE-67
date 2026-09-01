@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useGameSocket } from './hooks/useGameSocket';
+import { useAudioController, playSound } from './hooks/useAudio';
 import MainMenu  from './components/MainMenu';
 import Lobby     from './components/Lobby';
 import GameScreen from './components/GameScreen';
@@ -11,6 +13,19 @@ export default function App() {
     gameState, lobbyPlayers, endData, countdown, emotes,
     quickPlay, playSolo, startGame, sendInput, sendEmote, rematch, backToMenu, viewRecords,
   } = useGameSocket();
+
+  useAudioController(screen);
+
+  useEffect(() => {
+    const handlePointerDown = (e) => {
+      const target = e.target.closest('button, a, .clickable');
+      if (target && !target.closest('.dpad-container')) {
+        playSound('tap');
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, []);
 
   return (
     <div className="h-full">
