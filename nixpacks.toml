@@ -9,7 +9,8 @@ cmds = [
     "python -m venv /opt/venv",
     ". /opt/venv/bin/activate && pip install -r backend/requirements.txt",
     "rm -rf frontend/node_modules frontend/package-lock.json",
-    "npm install --prefix frontend"
+    "npm install --prefix frontend --include=optional",
+    "npm install --prefix frontend @rolldown/binding-linux-x64-gnu --no-save"
 ]
 
 [phases.build]
