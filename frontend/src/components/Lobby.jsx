@@ -2,10 +2,10 @@ export default function Lobby({ roomId, players, isHost, onStart }) {
   return (
     <div className="relative flex flex-col items-center justify-center h-full gap-6 px-4 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 pointer-events-none" />
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-80 h-80 bg-red-800/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-80 h-80 bg-[#CF010B]/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative text-center">
-        <h1 className="font-impact text-4xl tracking-widest text-[#e74c3c]">KILLER SNAKE</h1>
+        <h1 className="font-impact text-4xl tracking-widest text-[#CF010B]">KILLER SNAKE</h1>
         <p className="text-neutral-500 text-xs tracking-widest uppercase mt-1">Sala de espera</p>
       </div>
 
@@ -41,15 +41,15 @@ export default function Lobby({ roomId, players, isHost, onStart }) {
         {/* Start button (host only) */}
         {isHost ? (
           <button
-            className={`w-full py-4 rounded-2xl font-bold text-lg tracking-widest transition-all ${
+            className={`w-full py-4 rounded-2xl font-bold text-lg tracking-widest transition-all text-white ${
               players.length >= 2
-                ? 'bg-[#e74c3c] hover:bg-[#c0392b] active:scale-95 shadow-lg shadow-red-900/40'
+                ? 'bg-[#CF010B] hover:bg-[#a00008] active:scale-95 shadow-lg shadow-[#CF010B]/40'
                 : 'bg-white/5 text-neutral-600 cursor-not-allowed'
             }`}
             disabled={players.length < 2}
             onClick={onStart}
           >
-            {players.length >= 2 ? '▶ INICIAR PARTIDA' : 'Esperando al menos 2 jugadores...'}
+            {players.length >= 2 ? 'Iniciar Partida' : 'Esperando contrincantes'}
           </button>
         ) : (
           <div className="text-center text-neutral-500 text-sm animate-pulse">

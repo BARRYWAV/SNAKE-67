@@ -7,11 +7,10 @@ import uuid
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-GRID_SIZE = 30
 WIN_SCORE = 10
 ZONE_MAX  = 8   # máximo tiles que puede crecer la zona por lado
 
-PLAYER_COLORS = ["#e74c3c", "#2ecc71", "#9b59b6", "#3498db"]  # P1 P2 P3 P4
+PLAYER_COLORS = ["#CF010B", "#2ecc71", "#9b59b6", "#3498db"]  # P1 P2 P3 P4
 
 SPEED_MAP = {
     "easy":   150,
@@ -19,24 +18,31 @@ SPEED_MAP = {
     "hard":    60,
 }
 
-# Posiciones iniciales y dirección por índice de jugador (esquinas apuntando al centro)
-CORNER_CONFIGS = [
-    {"x": 3,            "y": 3,            "dx": 1,  "dy": 0},   # top-left → derecha
-    {"x": GRID_SIZE-4,  "y": GRID_SIZE-4,  "dx": -1, "dy": 0},  # bottom-right ← izquierda
-    {"x": GRID_SIZE-4,  "y": 3,            "dx": -1, "dy": 0},  # top-right ← izquierda
-    {"x": 3,            "y": GRID_SIZE-4,  "dx": 1,  "dy": 0},  # bottom-left → derecha
-]
-
+def get_corner_config(index: int, grid_size: int):
+    configs = [
+        {"x": 3,            "y": 3,            "dx": 1,  "dy": 0},
+        {"x": grid_size-4,  "y": grid_size-4,  "dx": -1, "dy": 0},
+        {"x": grid_size-4,  "y": 3,            "dx": -1, "dy": 0},
+        {"x": 3,            "y": grid_size-4,  "dx": 1,  "dy": 0},
+    ]
+    return configs[index % len(configs)]
 
 class Player:
-    def __init__(self, player_id: str, name: str, index: int, ws):
-        cfg = CORNER_CONFIGS[index % len(CORNER_CONFIGS)]
+    def __init__(self, player_id: str, name: str, index: int, ws, solo: bool, grid_size: int):
         self.id       = player_id
         self.name     = name
         self.color    = PLAYER_COLORS[index % len(PLAYER_COLORS)]
-        self.snake    = [{"x": cfg["x"], "y": cfg["y"]}]  # 1 segmento inicial
-        self.dx       = cfg["dx"]
-        self.dy       = cfg["dy"]
+        
+        if solo:
+            self.snake = [{"x": grid_size // 2, "y": grid_size // 2}]
+            self.dx    = 0
+            self.dy    = 0
+        else:
+            cfg = get_corner_config(index, grid_size)
+            self.snake = [{"x": cfg["x"], "y": cfg["y"]}]
+            self.dx    = cfg["dx"]
+            self.dy    = cfg["dy"]
+
         self.score    = 0
         self.alive    = True
         self.ws       = ws
@@ -56,8 +62,8 @@ class Player:
         if key not in moves:
             return
         ndx, ndy = moves[key]
-        # No revertir dirección
-        if ndx == -self.dx and ndy == -self.dy:
+        # No revertir dirección (solo si ya estamos en movimiento)
+        if (self.dx != 0 or self.dy != 0) and ndx == -self.dx and ndy == -self.dy:
             return
         self.pending_dx = ndx
         self.pending_dy = ndy
@@ -72,11 +78,11 @@ class Player:
             "alive": self.alive,
         }
 
-
 class GameRoom:
     def __init__(self, room_id: str, solo: bool = False, difficulty: str = "medium"):
         self.room_id    = room_id
         self.solo       = solo
+        self.grid_size  = 15 if solo else 30
         self.difficulty = difficulty
         self.players:   Dict[str, Player] = {}
         self.food:      Optional[Dict]    = None
@@ -90,7 +96,7 @@ class GameRoom:
 
     def add_player(self, player_id: str, name: str, ws) -> Player:
         index  = len(self.players)
-        player = Player(player_id, name, index, ws)
+        player = Player(player_id, name, index, ws, self.solo, self.grid_size)
         self.players[player_id] = player
         return player
 
@@ -108,9 +114,9 @@ class GameRoom:
     def _place_food(self):
         margin  = self.zone_level + 1          # buffer: nunca en el borde de zona
         safe_min = max(0, margin)
-        safe_max = min(GRID_SIZE - 1, GRID_SIZE - margin - 1)
+        safe_max = min(self.grid_size - 1, self.grid_size - margin - 1)
         if safe_min > safe_max:
-            safe_min, safe_max = 0, GRID_SIZE - 1
+            safe_min, safe_max = 0, self.grid_size - 1
 
         occupied = set()
         for p in self.players.values():
@@ -144,7 +150,7 @@ class GameRoom:
         z = self.zone_level
         if z == 0:
             return False
-        return x < z or x >= GRID_SIZE - z or y < z or y >= GRID_SIZE - z
+        return x < z or x >= self.grid_size - z or y < z or y >= self.grid_size - z
 
     # ── game loop ─────────────────────────────────────────────────────────────
 
@@ -155,14 +161,26 @@ class GameRoom:
         self._place_food()
         self.zone_level = 0
         tick_ms = SPEED_MAP.get(self.difficulty, 100) / 1000
+
+        if not self.solo:
+            for i in [3, 2, 1, "KILL"]:
+                await self._broadcast({"type": "countdown", "value": i})
+                await asyncio.sleep(1)
+
         self._task = asyncio.create_task(self._loop(tick_ms))
 
     def _reset_snakes(self):
         for idx, player in enumerate(self.players.values()):
-            cfg = CORNER_CONFIGS[idx % len(CORNER_CONFIGS)]
-            player.snake = [{"x": cfg["x"], "y": cfg["y"]}]
-            player.dx    = cfg["dx"]
-            player.dy    = cfg["dy"]
+            if self.solo:
+                player.snake = [{"x": self.grid_size // 2, "y": self.grid_size // 2}]
+                player.dx    = 0
+                player.dy    = 0
+            else:
+                cfg = get_corner_config(idx, self.grid_size)
+                player.snake = [{"x": cfg["x"], "y": cfg["y"]}]
+                player.dx    = cfg["dx"]
+                player.dy    = cfg["dy"]
+            
             player.score = 0
             player.alive = True
             player.pending_dx = None
@@ -195,6 +213,10 @@ class GameRoom:
         for p in self.players.values():
             if not p.alive:
                 continue
+            
+            # SOLO MODE: Esperar hasta que se mueva por primera vez
+            if p.dx == 0 and p.dy == 0:
+                continue
 
             new_head = {"x": p.snake[0]["x"] + p.dx, "y": p.snake[0]["y"] + p.dy}
             p.snake.insert(0, new_head)
@@ -202,7 +224,7 @@ class GameRoom:
             hx, hy = new_head["x"], new_head["y"]
 
             # Colisión pared
-            if hx < 0 or hx >= GRID_SIZE or hy < 0 or hy >= GRID_SIZE:
+            if hx < 0 or hx >= self.grid_size or hy < 0 or hy >= self.grid_size:
                 p.alive = False; p.snake.pop(); continue
 
             # Colisión zona venenosa
@@ -282,7 +304,7 @@ class GameRoom:
     async def _broadcast_state(self):
         state = {
             "type":       "game_state",
-            "grid":       GRID_SIZE,
+            "grid":       self.grid_size,
             "players":    [p.to_dict() for p in self.players.values()],
             "food":       self.food,
             "zone":       self.zone_level,

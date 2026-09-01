@@ -1,23 +1,14 @@
 import { useEffect, useRef } from 'react';
 
-const GRID = 30;
+// New dark tones for the grid
 const COLORS = {
-  tile_a:  '#7a7a7a',
-  tile_b:  '#626262',
+  tile_a:  '#1a1a1a',
+  tile_b:  '#1e1e1e',
   zone:    'rgba(180,0,0,0.55)',
-  zone_border: '#ff2020',
+  zone_border: '#CF010B',
   food:    '#f1c40f',
   food_rim:'#d4ac0d',
 };
-
-function darken(hex) {
-  try {
-    const r = parseInt(hex.slice(1,3),16);
-    const g = parseInt(hex.slice(3,5),16);
-    const b = parseInt(hex.slice(5,7),16);
-    return `rgb(${Math.floor(r*.55)},${Math.floor(g*.55)},${Math.floor(b*.55)})`;
-  } catch { return hex; }
-}
 
 export default function GameCanvas({ gameState, myId, size }) {
   const canvasRef = useRef(null);
@@ -26,6 +17,7 @@ export default function GameCanvas({ gameState, myId, size }) {
     if (!gameState || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx    = canvas.getContext('2d');
+    const { grid: GRID = 30 } = gameState; // Read dynamic grid from state
     const tile   = size / GRID;
 
     const { players, food, zone } = gameState;
@@ -70,45 +62,63 @@ export default function GameCanvas({ gameState, myId, size }) {
       ctx.beginPath();
       ctx.arc(fx, fy, tile * 0.38, 0, Math.PI * 2);
       ctx.fillStyle   = COLORS.food;
+      ctx.shadowBlur  = 15;
+      ctx.shadowColor = COLORS.food;
       ctx.fill();
+      ctx.shadowBlur  = 0;
       ctx.strokeStyle = COLORS.food_rim;
       ctx.lineWidth   = 1.5;
       ctx.stroke();
     }
 
-    // ── Snakes (alive only) ───────────────────────────────────────────────
+    // ── Snakes (Premium Path Rendering) ───────────────────────────────────
     for (const p of players) {
-      if (!p.alive) continue;
+      if (!p.alive || p.snake.length === 0) continue;
 
-      p.snake.forEach((seg, i) => {
-        ctx.fillStyle = i === 0 ? darken(p.color) : p.color;
-        // Round corners on head
-        if (i === 0) {
-          const x = seg.x * tile + 1;
-          const y = seg.y * tile + 1;
-          const w = tile - 2;
-          const r = Math.min(3, w / 3);
-          ctx.beginPath();
-          ctx.roundRect(x, y, w, w, r);
-          ctx.fill();
-        } else {
-          ctx.fillRect(seg.x * tile + 1, seg.y * tile + 1, tile - 2, tile - 2);
-        }
-      });
+      ctx.beginPath();
+      ctx.lineJoin = 'round';
+      ctx.lineCap  = 'round';
+      ctx.lineWidth = tile * 0.7; // Thicker snake body
+
+      const head = p.snake[0];
+      ctx.moveTo(head.x * tile + tile / 2, head.y * tile + tile / 2);
+
+      for (let i = 1; i < p.snake.length; i++) {
+        const seg = p.snake[i];
+        ctx.lineTo(seg.x * tile + tile / 2, seg.y * tile + tile / 2);
+      }
+
+      // Stroke style and shadow for Premium look
+      ctx.strokeStyle = p.color;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = p.color;
+      ctx.stroke();
+      ctx.shadowBlur = 0; // reset for next element
+
+      // Draw an inner lighter line to create a gradient-like volume effect
+      ctx.beginPath();
+      ctx.moveTo(head.x * tile + tile / 2, head.y * tile + tile / 2);
+      for (let i = 1; i < p.snake.length; i++) {
+        const seg = p.snake[i];
+        ctx.lineTo(seg.x * tile + tile / 2, seg.y * tile + tile / 2);
+      }
+      ctx.lineWidth = tile * 0.3;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.stroke();
 
       // Name tag above head
-      if (p.snake.length > 0) {
-        const head = p.snake[0];
-        ctx.fillStyle  = 'white';
-        ctx.font       = `bold ${Math.max(7, tile * 0.65)}px Inter`;
-        ctx.textAlign  = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(
-          p.name.length > 8 ? p.name.slice(0, 7) + '…' : p.name,
-          head.x * tile + tile / 2,
-          head.y * tile - 1
-        );
-      }
+      ctx.fillStyle  = 'white';
+      ctx.font       = `bold ${Math.max(7, tile * 0.55)}px Inter`;
+      ctx.textAlign  = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.shadowBlur = 2;
+      ctx.shadowColor = 'black';
+      ctx.fillText(
+        p.name.length > 8 ? p.name.slice(0, 7) + '…' : p.name,
+        head.x * tile + tile / 2,
+        head.y * tile - 4
+      );
+      ctx.shadowBlur = 0;
     }
   }, [gameState, size]);
 
@@ -117,7 +127,7 @@ export default function GameCanvas({ gameState, myId, size }) {
       ref={canvasRef}
       width={size}
       height={size}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, borderRadius: '12px' }}
     />
   );
 }

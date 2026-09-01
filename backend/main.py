@@ -122,6 +122,16 @@ async def ws_endpoint(websocket: WebSocket):
                     await room.rematch()
                     await room._broadcast({"type": "game_started"})
 
+            # ── Emote ──────────────────────────────────────────────────────
+            elif mtype == "emote":
+                if room:
+                    emote_id = msg.get("emote", "skull")
+                    await room._broadcast({
+                        "type": "emote",
+                        "playerId": player_id,
+                        "emote": emote_id
+                    })
+
     except WebSocketDisconnect:
         if room:
             room.remove_player(player_id)

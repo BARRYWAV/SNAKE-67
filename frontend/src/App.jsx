@@ -7,8 +7,8 @@ import GameOver  from './components/GameOver';
 export default function App() {
   const {
     screen, myId, roomId, isHost, isSolo,
-    gameState, lobbyPlayers, endData,
-    quickPlay, playSolo, startGame, sendInput, rematch, backToMenu,
+    gameState, lobbyPlayers, endData, countdown, emotes,
+    quickPlay, playSolo, startGame, sendInput, sendEmote, rematch, backToMenu,
   } = useGameSocket();
 
   return (
@@ -35,6 +35,10 @@ export default function App() {
           myId={myId}
           isSolo={isSolo}
           sendInput={sendInput}
+          countdown={countdown}
+          emotes={emotes}
+          sendEmote={sendEmote}
+          backToMenu={backToMenu}
         />
       )}
 

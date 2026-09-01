@@ -1,51 +1,47 @@
 export default function GameOver({ endData, isSolo, onRematch, onMenu }) {
   const { winner, scores } = endData || {};
-  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
 
   return (
-    <div className="relative flex flex-col items-center justify-center h-full gap-6 px-4 overflow-hidden">
+    <div className="relative flex flex-col items-center justify-center h-full gap-8 px-4 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 pointer-events-none" />
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-80 h-80 bg-red-800/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#CF010B]/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative text-center">
-        <h1 className="font-impact text-4xl tracking-widest text-[#e74c3c]">
-          {winner ? '🏆 GAME OVER' : '💀 GAME OVER'}
+        <h1 className="font-impact text-6xl tracking-widest text-white drop-shadow-md">
+          {winner ? 'GAME OVER' : 'FIN DE PARTIDA'}
         </h1>
-        {winner && (
-          <p className="text-white text-xl font-bold mt-2">
-            ¡<span className="text-[#e74c3c]">{winner}</span> gana!
+        {winner && !isSolo && (
+          <p className="text-white text-xl font-bold mt-2 tracking-widest uppercase">
+            <span className="text-[#CF010B] font-impact text-2xl">{winner}</span> HA GANADO
           </p>
         )}
       </div>
 
       {/* Scores */}
-      <div className="relative glass p-5 w-full max-w-sm flex flex-col gap-3">
-        <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1">Resultados</p>
+      <div className="relative glass p-6 w-full max-w-sm flex flex-col gap-4">
+        <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1 text-center">Puntajes</p>
         {(scores || []).map((s, i) => (
-          <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-xl bg-white/5">
-            <span className="text-xl">{medals[i] || (i + 1) + '.'}</span>
-            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: s.color }} />
-            <span className="font-bold tracking-wider flex-1">{s.name}</span>
-            <span className="text-[#f1c40f] font-bold">{s.score} ⭐</span>
+          <div key={i} className="flex items-center gap-4 py-3 px-4 rounded-xl bg-white/5 border border-white/5">
+            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ background: s.color, boxShadow: `0 0 10px ${s.color}` }} />
+            <span className="font-bold tracking-widest flex-1 text-lg">{s.name}</span>
+            <span className="text-[#f1c40f] font-impact text-2xl drop-shadow-md">{s.score} ⭐</span>
           </div>
         ))}
       </div>
 
       {/* Actions */}
-      <div className="relative flex gap-3 w-full max-w-sm">
-        {!isSolo && (
-          <button
-            className="flex-1 py-4 rounded-2xl bg-[#e74c3c] hover:bg-[#c0392b] active:scale-95 font-bold tracking-widest transition-all shadow-lg shadow-red-900/40"
-            onClick={onRematch}
-          >
-            🔁 REVANCHA
-          </button>
-        )}
+      <div className="relative flex gap-4 w-full max-w-sm">
         <button
-          className={`py-4 rounded-2xl border border-white/10 hover:bg-white/5 active:scale-95 font-bold tracking-widest transition-all text-neutral-300 ${isSolo ? 'flex-1' : 'px-5'}`}
+          className="flex-1 py-4 rounded-2xl bg-[#CF010B] hover:bg-[#a00008] active:scale-95 text-white font-bold tracking-widest transition-all shadow-lg shadow-[#CF010B]/40 flex items-center justify-center text-xl"
+          onClick={onRematch}
+        >
+          🔁
+        </button>
+        <button
+          className="flex-1 py-4 rounded-2xl border border-white/10 hover:bg-white/5 active:scale-95 text-white font-bold tracking-widest transition-all uppercase flex items-center justify-center text-sm"
           onClick={onMenu}
         >
-          🏠 MENÚ
+          MENÚ
         </button>
       </div>
     </div>
