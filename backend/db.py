@@ -43,14 +43,25 @@ def add_vs_win(name: str):
             ON CONFLICT(name) DO UPDATE SET wins = wins + 1
         ''', (name,))
 
-def get_top_solo(limit: int = 10):
+def get_top_solo():
     with get_db() as conn:
-        cur = conn.execute('SELECT name, score, difficulty, timestamp FROM solo_scores ORDER BY score DESC LIMIT ?', (limit,))
+        cur = conn.execute('''
+            SELECT name, max(score) as score, difficulty 
+            FROM solo_scores 
+            GROUP BY difficulty
+            ORDER BY 
+                CASE difficulty 
+                    WHEN 'easy' THEN 1 
+                    WHEN 'medium' THEN 2 
+                    WHEN 'hard' THEN 3 
+                    ELSE 4 
+                END
+        ''')
         return [dict(row) for row in cur.fetchall()]
 
-def get_top_vs(limit: int = 10):
+def get_top_vs():
     with get_db() as conn:
-        cur = conn.execute('SELECT name, wins FROM vs_wins ORDER BY wins DESC LIMIT ?', (limit,))
+        cur = conn.execute('SELECT name, wins FROM vs_wins ORDER BY wins DESC LIMIT 1')
         return [dict(row) for row in cur.fetchall()]
 
 init_db()
