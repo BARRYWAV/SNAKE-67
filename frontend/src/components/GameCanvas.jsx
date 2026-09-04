@@ -53,7 +53,7 @@ export default function GameCanvas({ gameState, myId, size, isSolo }) {
       
       const now = Date.now();
       const elapsed = now - lastStateTime.current;
-      const t = Math.min(1, elapsed / (tick_s * 1000));
+      const t = Math.min(1.2, elapsed / (tick_s * 1000));
 
       ctx.clearRect(0, 0, size, size);
 

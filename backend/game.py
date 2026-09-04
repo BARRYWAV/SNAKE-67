@@ -54,11 +54,10 @@ class Player:
         self.score    = 0
         self.alive    = True
         self.ws       = ws
-        self.pending_dx: Optional[int] = None
-        self.pending_dy: Optional[int] = None
+        self.input_queue: list[tuple[int, int]] = []
 
     def apply_input(self, key: str):
-        """Aplica dirección sin revertir."""
+        """Aplica dirección a la cola de comandos sin revertir."""
         moves = {
             "ArrowUp":    ( 0, -1),
             "ArrowDown":  ( 0,  1),
@@ -71,17 +70,24 @@ class Player:
             return
         ndx, ndy = moves[key]
         
+        # Determine the last commanded direction
+        last_dx, last_dy = self.dx, self.dy
+        if self.input_queue:
+            last_dx, last_dy = self.input_queue[-1]
+            
         # Prevent reversing when moving
-        if (self.dx != 0 or self.dy != 0) and ndx == -self.dx and ndy == -self.dy:
+        if (last_dx != 0 or last_dy != 0) and ndx == -last_dx and ndy == -last_dy:
             return
+            
         # Prevent moving into own body when stationary (initial solo spawn)
-        elif self.dx == 0 and self.dy == 0 and len(self.snake) > 1:
+        if last_dx == 0 and last_dy == 0 and len(self.snake) > 1:
             next_x, next_y = self.snake[0]["x"] + ndx, self.snake[0]["y"] + ndy
             if next_x == self.snake[1]["x"] and next_y == self.snake[1]["y"]:
                 return
                 
-        self.pending_dx = ndx
-        self.pending_dy = ndy
+        # Limit queue to prevent spam
+        if len(self.input_queue) < 3:
+            self.input_queue.append((ndx, ndy))
 
     def to_dict(self):
         return {
@@ -208,11 +214,13 @@ class GameRoom:
             
             player.score = 0
             player.alive = True
-            player.pending_dx = None
-            player.pending_dy = None
+            player.input_queue.clear()
 
     async def _loop(self):
         try:
+            loop = asyncio.get_running_loop()
+            next_tick = loop.time()
+            
             while self.started and not self.finished:
                 if self.solo:
                     current_tick_s = SPEED_MAP.get(self.difficulty, 90) / 1000.0
@@ -220,7 +228,11 @@ class GameRoom:
                     current_tick_ms = max(50, 150 - (self.zone_level * 10))
                     current_tick_s = current_tick_ms / 1000.0
                     
-                await asyncio.sleep(current_tick_s)
+                next_tick += current_tick_s
+                now = loop.time()
+                sleep_time = max(0, next_tick - now)
+                
+                await asyncio.sleep(sleep_time)
                 await self._tick(current_tick_s)
         except asyncio.CancelledError:
             pass
@@ -233,11 +245,8 @@ class GameRoom:
         for p in self.players.values():
             if not p.alive:
                 continue
-            if p.pending_dx is not None:
-                p.dx = p.pending_dx
-                p.dy = p.pending_dy
-                p.pending_dx = None
-                p.pending_dy = None
+            if p.input_queue:
+                p.dx, p.dy = p.input_queue.pop(0)
 
         # Mover serpientes
         ate_food: Optional[str] = None
